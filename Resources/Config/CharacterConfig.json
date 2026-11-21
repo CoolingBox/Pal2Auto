@@ -1,0 +1,74 @@
+[
+  {
+    "Id": 1,
+    "Name": "王小虎",
+    "Title": "江湖游侠",
+    "Portrait": "p01",
+    "Style": "兵器 · 连击",
+    "Specialty": "同列兵器额外获得 +5% 效果",
+    "StarterName": "长剑",
+    "StarterIcon": "item_sword",
+    "StarterDesc": "每 2 秒劈出一剑，造成 8 点伤害。",
+    "Desc": "杭州城里长大的野小子，拳脚和嘴都不肯吃亏。"
+  },
+  {
+    "Id": 2,
+    "Name": "沈欺霜",
+    "Title": "冰心玉骨",
+    "Portrait": "p12",
+    "Style": "护体 · 反伤",
+    "Specialty": "护体类物品冷却 -10%",
+    "StarterName": "金刚符",
+    "StarterIcon": "item_talisman_guard",
+    "StarterDesc": "每 4 秒给自己 14 点护体。",
+    "Desc": "仙霞派弟子，冷面热心，活得久才有输出。"
+  },
+  {
+    "Id": 3,
+    "Name": "苏媚",
+    "Title": "千面妖姬",
+    "Portrait": "p33",
+    "Style": "蛊毒 · 消耗",
+    "Specialty": "中毒上限 +5 层",
+    "StarterName": "蛇涎蛊",
+    "StarterIcon": "item_poison",
+    "StarterDesc": "每 2.4 秒施加 2 层中毒，可叠加。",
+    "Desc": "狐族后人，笑起来最危险，不打爆发只等你掉血。"
+  },
+  {
+    "Id": 4,
+    "Name": "李忆如",
+    "Title": "灵狐之女",
+    "Portrait": "p28",
+    "Style": "符咒 · 法术",
+    "Specialty": "符咒伤害无视护体",
+    "StarterName": "天师符",
+    "StarterIcon": "item_talisman_atk",
+    "StarterDesc": "每 3.6 秒造成 10 点法术伤害，无视护体。",
+    "Desc": "李逍遥与赵灵儿之女，天生通灵，符咒贵但穿盾。"
+  },
+  {
+    "Id": 5,
+    "Name": "李逍遥",
+    "Title": "御剑飞仙",
+    "Portrait": "p26",
+    "Style": "快剑 · 连击",
+    "Specialty": "兵器冷却 -8%",
+    "StarterName": "柳叶刀",
+    "StarterIcon": "item_saber",
+    "StarterDesc": "每 1.6 秒造成 6 点伤害，每第 3 次额外 4 点。",
+    "Desc": "余杭镇客栈的店小二，一剑一酒走江湖。"
+  },
+  {
+    "Id": 6,
+    "Name": "阿奴",
+    "Title": "苗疆圣女",
+    "Portrait": "p11",
+    "Style": "暗器 · 先手",
+    "Specialty": "暗器类物品价格 -1",
+    "StarterName": "梅花镖",
+    "StarterIcon": "item_dart",
+    "StarterDesc": "每 2.2 秒造成 7 点伤害，无视护体。",
+    "Desc": "苗疆来的小姑娘，袖子里什么都藏得住。"
+  }
+]
