@@ -1,6 +1,6 @@
 // 文件：BigNum.cs
 // 作者：急冻雪柜
-// 描述：大数系统(尾数+指数, break_infinity 思路)。放置/增量游戏用,可稳定表示到 1e(1e308),且性能远好于 BigInteger。
+// 描述：大数系统(尾数+指数, break_infinity 思路)。可稳定表示到 1e(1e308),性能远好于 BigInteger。
 // 日期：2026/09/23
 
 using System;
@@ -13,7 +13,7 @@ namespace TinyFramework;
 
 /// <summary>
 /// 大数显示模式。
-/// Scientific = 科学表示法(K/M/B/T/aa 字母后缀,放置游戏惯例);
+/// Scientific = 科学表示法(K/M/B/T/aa 字母后缀,常见于数值膨胀类游戏);
 /// Chinese    = 中文计数法(万/亿/兆/京/垓/秭/穰/沟/涧/正/载 万进制单位)。
 /// </summary>
 public enum NumberFormat
@@ -108,7 +108,7 @@ public struct BigNum : IComparable<BigNum>, IEquatable<BigNum>
 
     public static BigNum operator /(BigNum a, BigNum b)
     {
-        if (b.IsZero) return Zero;       // 除以 0 视为 0(放置游戏通常不崩)
+        if (b.IsZero) return Zero;       // 除以 0 视为 0(配置表写错时不至于崩)
         if (a.IsZero) return Zero;
         return Normalize(a.Mantissa / b.Mantissa, a.Exponent - b.Exponent);
     }

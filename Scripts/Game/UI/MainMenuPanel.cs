@@ -11,16 +11,16 @@ public class MainMenuPanel : BasePanel
     private const float H = 540f;
 
     private Control _root;
+    private Button _qualityButton;
     private bool _built;
 
     public override void OnBind(Control control)
     {
         base.OnBind(control);
         _root = control;
-        // 版面按 960x540 写；工程画布是 1920x1080，整块按 2 倍放大铺满
+        // 版面按 960x540 写，和离屏画布同尺寸，不需要缩放
         _root.Position = Vector2.Zero;
         _root.Size = new Vector2(960f, 540f);
-        _root.Scale = new Vector2(2f, 2f);
         Build();
     }
 
@@ -28,6 +28,32 @@ public class MainMenuPanel : BasePanel
     {
         base.OnShow();
         AudioManager.PlayBGM("market");
+        RefreshQualityButton();
+    }
+
+    private void RefreshQualityButton()
+    {
+        if (_qualityButton == null)
+        {
+            return;
+        }
+
+        _qualityButton.Text = SettingManager.Data.XbrzEnabled ? "画质：xBRZ 开" : "画质：原像素";
+    }
+
+    private void OnQualityPressed()
+    {
+        bool on = !SettingManager.Data.XbrzEnabled;
+        SettingManager.Data.XbrzEnabled = on;
+        SaveManager.Save(SettingManager.Data);
+
+        if (GameRoot.Instance != null)
+        {
+            GameRoot.Instance.ApplyXbrz(on);
+        }
+
+        RefreshQualityButton();
+        AudioManager.PlayUISFX("ui_click");
     }
 
     private void Build()
@@ -130,9 +156,16 @@ public class MainMenuPanel : BasePanel
         quit.Pressed += OnQuitPressed;
         _root.AddChild(quit);
 
+        _qualityButton = UiKit.MakeButton("画质：xBRZ 开", false);
+        _qualityButton.Position = new Vector2(56f, 326f);
+        _qualityButton.Size = new Vector2(216f, 34f);
+        _qualityButton.AddThemeFontSizeOverride("font_size", 14);
+        _qualityButton.Pressed += OnQualityPressed;
+        _root.AddChild(_qualityButton);
+
         Label hint = UiKit.MakeLabel("选一位侠客，决定开局携带的那件家伙。\n摆摊与打擂还在施工中。",
             12, UiKit.Dim);
-        UiKit.Place(hint, 56f, 330f, 300f, 46f);
+        UiKit.Place(hint, 56f, 372f, 300f, 46f);
         hint.AutowrapMode = TextServer.AutowrapMode.Arbitrary;
         hint.VerticalAlignment = VerticalAlignment.Top;
         _root.AddChild(hint);

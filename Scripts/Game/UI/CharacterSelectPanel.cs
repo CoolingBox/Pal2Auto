@@ -47,10 +47,9 @@ public class CharacterSelectPanel : BasePanel
     {
         base.OnBind(control);
         _root = control;
-        // 版面按 960x540 写；工程画布是 1920x1080，整块按 2 倍放大铺满
+        // 版面按 960x540 写，和离屏画布同尺寸，不需要缩放
         _root.Position = Vector2.Zero;
         _root.Size = new Vector2(960f, 540f);
-        _root.Scale = new Vector2(2f, 2f);
         Build();
     }
 
