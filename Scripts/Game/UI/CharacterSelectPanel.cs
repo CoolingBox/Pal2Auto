@@ -36,9 +36,8 @@ public class CharacterSelectPanel : BasePanel
     private Label _detailStyle;
     private Label _detailSpecialty;
     private Label _detailDesc;
-    private TextureRect _starterIcon;
-    private Label _starterName;
-    private Label _starterDesc;
+    private readonly TextureRect[] _deckIcons = new TextureRect[12];
+    private Label _deckSummary;
 
 
     public override void OnBind(Control control)
@@ -93,7 +92,7 @@ public class CharacterSelectPanel : BasePanel
         UiKit.Place(title, 24f, 16f, 420f, 38f);
         _root.AddChild(title);
 
-        Label hint = UiKit.MakeLabel("选谁只影响开局那件家伙；各人特长规则还在做。", 12, UiKit.Dim);
+        Label hint = UiKit.MakeLabel("选人即选牌组：十二张牌决定你打得多快、扛得多住。", 12, UiKit.Dim);
         UiKit.Place(hint, 24f, 54f, 460f, 22f);
         _root.AddChild(hint);
 
@@ -137,27 +136,22 @@ public class CharacterSelectPanel : BasePanel
         _detailSpecialty.VerticalAlignment = VerticalAlignment.Top;
         _root.AddChild(_detailSpecialty);
 
-        Label starterTag = UiKit.MakeLabel("开局携带", 12, UiKit.Dim);
-        UiKit.Place(starterTag, DetailX + 16f, DetailY + 216f, 120f, 20f);
-        _root.AddChild(starterTag);
+        Label deckTag = UiKit.MakeLabel("随身牌组", 12, UiKit.Dim);
+        UiKit.Place(deckTag, DetailX + 16f, DetailY + 216f, 120f, 20f);
+        _root.AddChild(deckTag);
 
-        _starterIcon = new TextureRect();
-        _starterIcon.ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize;
-        _starterIcon.StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered;
-        _starterIcon.MouseFilter = Control.MouseFilterEnum.Ignore;
-        _root.AddChild(_starterIcon);
-        _starterIcon.Position = new Vector2(DetailX + 16f, DetailY + 238f);
-        _starterIcon.Size = new Vector2(62f, 62f);
+        for (int i = 0; i < _deckIcons.Length; i++)
+        {
+            TextureRect icon = new TextureRect();
+            icon.ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize;
+            icon.StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered;
+            icon.MouseFilter = Control.MouseFilterEnum.Ignore;
+            AddChildIcon(icon, i);
+        }
 
-        _starterName = UiKit.MakeLabel("", 16, UiKit.Paper);
-        UiKit.Place(_starterName, DetailX + 90f, DetailY + 242f, 300f, 24f);
-        _root.AddChild(_starterName);
-
-        _starterDesc = UiKit.MakeLabel("", 11, UiKit.PaperDim);
-        UiKit.Place(_starterDesc, DetailX + 90f, DetailY + 262f, 306f, 46f);
-        _starterDesc.AutowrapMode = TextServer.AutowrapMode.Arbitrary;
-        _starterDesc.VerticalAlignment = VerticalAlignment.Top;
-        _root.AddChild(_starterDesc);
+        _deckSummary = UiKit.MakeLabel("", 11, UiKit.PaperDim);
+        UiKit.Place(_deckSummary, DetailX + 200f, DetailY + 216f, 190f, 20f);
+        _root.AddChild(_deckSummary);
 
         _detailDesc = UiKit.MakeLabel("", 12, UiKit.PaperDim);
         UiKit.Place(_detailDesc, DetailX + 16f, DetailY + 306f, 380f, 44f);
@@ -172,10 +166,21 @@ public class CharacterSelectPanel : BasePanel
         confirm.Pressed += OnConfirmPressed;
         _root.AddChild(confirm);
 
-        Label note = UiKit.MakeLabel("※ 特长标注为预告，本版只生效初始物件", 11, UiKit.Dim);
+        Label note = UiKit.MakeLabel("※ 随身牌组已生效；每人特长规则仍是预告", 11, UiKit.Dim);
         UiKit.Place(note, 24f, 478f, 460f, 20f);
         _root.AddChild(note);
 
+    }
+
+    /// <summary>12 个牌位按 6 列 2 行摆开：一眼看出这套牌是快是慢、攻多还是守多。</summary>
+    private void AddChildIcon(TextureRect icon, int index)
+    {
+        int col = index % 6;
+        int row = index / 6;
+        _root.AddChild(icon);
+        icon.Position = new Vector2(DetailX + 16f + col * 30f, DetailY + 240f + row * 30f);
+        icon.Size = new Vector2(28f, 28f);
+        _deckIcons[index] = icon;
     }
 
     private void ReloadCharacters()
@@ -234,9 +239,59 @@ public class CharacterSelectPanel : BasePanel
         _detailSpecialty.Text = "特长（预告）：" + cfg.Specialty;
         _detailDesc.Text = cfg.Desc;
 
-        _starterIcon.Texture = UiKit.LoadTexture("res://Resources/Image/Items/" + cfg.StarterIcon + ".png");
-        _starterName.Text = cfg.StarterName;
-        _starterDesc.Text = cfg.StarterDesc;
+        RefreshDeck(cfg);
+    }
+
+    /// <summary>把这位侠客的 12 张牌铺成图标，并给一句配比摘要。</summary>
+    private void RefreshDeck(CharacterConfig cfg)
+    {
+        int weapons = 0;
+        int spells = 0;
+        int guards = 0;
+        int heals = 0;
+        int poisons = 0;
+
+        for (int i = 0; i < _deckIcons.Length; i++)
+        {
+            if (cfg.Deck == null || i >= cfg.Deck.Length)
+            {
+                _deckIcons[i].Texture = null;
+                continue;
+            }
+
+            CardConfig card = ConfigManager.GetOne<CardConfig>(cfg.Deck[i]);
+            if (card == null)
+            {
+                _deckIcons[i].Texture = null;
+                continue;
+            }
+
+            _deckIcons[i].Texture = UiKit.LoadTexture("res://Resources/Image/Items/" + card.Icon + ".png");
+
+            if (card.Type == CardType.Spell)
+            {
+                spells++;
+            }
+            else if (card.Type == CardType.Guard)
+            {
+                guards++;
+            }
+            else if (card.Type == CardType.Heal)
+            {
+                heals++;
+            }
+            else if (card.Type == CardType.Poison)
+            {
+                poisons++;
+            }
+            else
+            {
+                weapons++;
+            }
+        }
+
+        _deckSummary.Text = "兵 " + weapons + " · 术 " + spells + " · 守 " + guards +
+                            " · 疗 " + heals + " · 毒 " + poisons;
     }
 
     private CharacterConfig FindCharacter(int id)
