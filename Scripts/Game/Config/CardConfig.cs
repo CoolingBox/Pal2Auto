@@ -23,6 +23,8 @@ public class CardConfig : BaseConfig
     public float Countdown = 2f;
 
     public int Damage;
+    /// <summary>火焰伤害：结算方式和普通伤害一致（吃护体），只是卡面/飘字用橙黄区分。</summary>
+    public int Fire;
     public int Shield;
     public int Heal;
     public int Poison;

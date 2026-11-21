@@ -38,6 +38,7 @@ public struct BattleEvent
     public string Text;
     public CardConfig Card;
     public bool IgnoredShield;
+    public bool IsFire;
 }
 
 public sealed class HandSlot
@@ -313,6 +314,19 @@ public sealed class DeckBattle
             dmg.IgnoredShield = card.IgnoreShield;
             dmg.Text = card.Name + " " + card.Damage;
             events.Add(dmg);
+        }
+
+        if (card.Fire > 0)
+        {
+            int burned = ApplyDamage(Enemy, card.Fire, false);
+            BattleEvent fireEvent = new BattleEvent();
+            fireEvent.Kind = BattleEventKind.Damage;
+            fireEvent.Side = BattleSide.Enemy;
+            fireEvent.Slot = slot;
+            fireEvent.Value = burned > 0 ? burned : card.Fire;
+            fireEvent.IsFire = true;
+            fireEvent.Text = card.Name + " 火 " + card.Fire;
+            events.Add(fireEvent);
         }
 
         if (card.Shield > 0)

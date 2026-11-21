@@ -300,7 +300,7 @@ public class BattlePanel : BasePanel
         }
 
         List<int> deck = new List<int>();
-        for (int id = 1; id <= 10; id++)
+        for (int id = 1; id <= 12; id++)
         {
             deck.Add(id);
         }
@@ -388,8 +388,9 @@ public class BattlePanel : BasePanel
                     break;
 
                 case BattleEventKind.Damage:
+                    Color dmgColor = evt.IsFire ? UiKit.FireOrange : UiKit.DamageRed;
                     ShowFloating(evt.Side == BattleSide.Enemy ? EnemyPoint() : PlayerPoint(),
-                        "-" + evt.Value, new Color(0.850f, 0.360f, 0.280f));
+                        "-" + evt.Value, dmgColor);
                     if (evt.Side == BattleSide.Enemy)
                     {
                         AudioManager.PlaySFX("hit", true);
@@ -398,18 +399,18 @@ public class BattlePanel : BasePanel
 
                 case BattleEventKind.Shield:
                     ShowFloating(evt.Side == BattleSide.Enemy ? EnemyPoint() : PlayerPoint(),
-                        "+" + evt.Value + " 护", new Color(0.470f, 0.600f, 0.720f));
+                        "+" + evt.Value + " 护", UiKit.ShieldGold);
                     PushLog(evt.Text);
                     break;
 
                 case BattleEventKind.Heal:
-                    ShowFloating(PlayerPoint(), "+" + evt.Value, new Color(0.420f, 0.700f, 0.480f));
+                    ShowFloating(PlayerPoint(), "+" + evt.Value, UiKit.HealGreen);
                     PushLog(evt.Text);
                     break;
 
                 case BattleEventKind.Poison:
                     ShowFloating(evt.Side == BattleSide.Enemy ? EnemyPoint() : PlayerPoint(),
-                        "-" + evt.Value, new Color(0.520f, 0.680f, 0.360f));
+                        "-" + evt.Value, UiKit.PoisonGreen);
                     PushLog(evt.Text);
                     break;
 

@@ -15,6 +15,13 @@ public static class UiKit
     public static readonly Color Vermilion = new Color(0.690f, 0.220f, 0.180f);
     public static readonly Color Dim = new Color(0.480f, 0.440f, 0.370f);
 
+    // —— 效果配色：卡面标签、边框、飘字共用一套，避免同一个效果三种颜色 ——
+    public static readonly Color DamageRed = new Color(0.720f, 0.270f, 0.230f);   // 攻：物理伤害
+    public static readonly Color FireOrange = new Color(0.880f, 0.600f, 0.240f);  // 火：火焰伤害
+    public static readonly Color ShieldGold = new Color(0.850f, 0.710f, 0.300f);  // 守：护体
+    public static readonly Color HealGreen = new Color(0.310f, 0.640f, 0.420f);   // 疗：回复
+    public static readonly Color PoisonGreen = new Color(0.290f, 0.560f, 0.360f); // 毒：中毒（深绿色相，提亮一档才在黑卡面上读得清）
+
     public static Font GameFont { get; private set; }
 
     public static void Init()

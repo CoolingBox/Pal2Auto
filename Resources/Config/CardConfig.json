@@ -79,7 +79,8 @@
     "Countdown": 3.0,
     "Heal": 8,
     "Icon": "item_pill",
-    "Desc": "回复 10 点气血。"
+    "Desc": "回复 10 点气血。",
+    "Shield": 4
   },
   {
     "Id": 10,
@@ -88,6 +89,26 @@
     "Countdown": 2.0,
     "Poison": 2,
     "Icon": "item_poison",
-    "Desc": "施加 2 层中毒。"
+    "Desc": "施加 2 层中毒。",
+    "Damage": 3
+  },
+  {
+    "Id": 11,
+    "Name": "烈火符",
+    "Type": "Attack",
+    "Countdown": 2.6,
+    "Fire": 12,
+    "Icon": "item_brush",
+    "Desc": "火焰 12 点伤害。"
+  },
+  {
+    "Id": 12,
+    "Name": "炎爆",
+    "Type": "Attack",
+    "Countdown": 3.2,
+    "Fire": 16,
+    "Poison": 1,
+    "Icon": "item_dart2",
+    "Desc": "火焰 16 点伤害，附带 1 层中毒。"
   }
 ]
