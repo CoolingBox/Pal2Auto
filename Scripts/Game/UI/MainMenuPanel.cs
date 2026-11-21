@@ -11,7 +11,6 @@ public class MainMenuPanel : BasePanel
     private const float H = 540f;
 
     private Control _root;
-    private Button _qualityButton;
     private bool _built;
 
     public override void OnBind(Control control)
@@ -28,32 +27,12 @@ public class MainMenuPanel : BasePanel
     {
         base.OnShow();
         AudioManager.PlayBGM("market");
-        RefreshQualityButton();
     }
 
-    private void RefreshQualityButton()
+    private void OnSettingsPressed()
     {
-        if (_qualityButton == null)
-        {
-            return;
-        }
-
-        _qualityButton.Text = SettingManager.Data.XbrzEnabled ? "画质：xBRZ 开" : "画质：原像素";
-    }
-
-    private void OnQualityPressed()
-    {
-        bool on = !SettingManager.Data.XbrzEnabled;
-        SettingManager.Data.XbrzEnabled = on;
-        SaveManager.Save(SettingManager.Data);
-
-        if (GameRoot.Instance != null)
-        {
-            GameRoot.Instance.ApplyXbrz(on);
-        }
-
-        RefreshQualityButton();
-        AudioManager.PlayUISFX("ui_click");
+        AudioManager.PlayUISFX("ui_open");
+        UIManager.ShowPanel<SettingsPanel>();
     }
 
     private void Build()
@@ -150,22 +129,21 @@ public class MainMenuPanel : BasePanel
         start.Pressed += OnStartPressed;
         _root.AddChild(start);
 
+        Button settings = UiKit.MakeButton("设 置", false);
+        settings.Position = new Vector2(56f, 276f);
+        settings.Size = new Vector2(216f, 40f);
+        settings.Pressed += OnSettingsPressed;
+        _root.AddChild(settings);
+
         Button quit = UiKit.MakeButton("离 开", false);
-        quit.Position = new Vector2(56f, 276f);
+        quit.Position = new Vector2(56f, 326f);
         quit.Size = new Vector2(216f, 40f);
         quit.Pressed += OnQuitPressed;
         _root.AddChild(quit);
 
-        _qualityButton = UiKit.MakeButton("画质：xBRZ 开", false);
-        _qualityButton.Position = new Vector2(56f, 326f);
-        _qualityButton.Size = new Vector2(216f, 34f);
-        _qualityButton.AddThemeFontSizeOverride("font_size", 14);
-        _qualityButton.Pressed += OnQualityPressed;
-        _root.AddChild(_qualityButton);
-
         Label hint = UiKit.MakeLabel("选一位侠客，决定开局携带的那件家伙。\n摆摊与打擂还在施工中。",
             12, UiKit.Dim);
-        UiKit.Place(hint, 56f, 372f, 300f, 46f);
+        UiKit.Place(hint, 56f, 378f, 300f, 46f);
         hint.AutowrapMode = TextServer.AutowrapMode.Arbitrary;
         hint.VerticalAlignment = VerticalAlignment.Top;
         _root.AddChild(hint);

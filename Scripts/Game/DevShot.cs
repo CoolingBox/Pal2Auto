@@ -16,6 +16,10 @@ public static class DevShot
             {
                 OpenSelectLater(host);
             }
+            if (all[i] == "--ui=settings")
+            {
+                OpenSettingsLater(host);
+            }
             if (all[i] == "--clicktest")
             {
                 RunClickTest(host);
@@ -78,6 +82,12 @@ public static class DevShot
         up.Position = position;
         Input.ParseInputEvent(up);
         await host.ToSignal(host.GetTree(), SceneTree.SignalName.ProcessFrame);
+    }
+
+    private static async void OpenSettingsLater(Node host)
+    {
+        await host.ToSignal(host.GetTree().CreateTimer(0.3f), SceneTreeTimer.SignalName.Timeout);
+        TinyFramework.UIManager.ShowPanel<SettingsPanel>();
     }
 
     private static async void OpenSelectLater(Node host)
