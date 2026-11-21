@@ -6,7 +6,7 @@
     "Countdown": 1.8,
     "Damage": 8,
     "Icon": "item_sword",
-    "Desc": "劈出一剑，造成 8 点伤害。"
+    "Desc": "每 1.8 秒一剑，8 点伤害。江湖上最不会出错的选择。"
   },
   {
     "Id": 2,
@@ -15,7 +15,7 @@
     "Countdown": 1.4,
     "Damage": 6,
     "Icon": "item_saber",
-    "Desc": "轻快一刀，6 点伤害。"
+    "Desc": "轻快一刀，6 点伤害，蓄势短。"
   },
   {
     "Id": 3,
@@ -23,8 +23,9 @@
     "Type": "Attack",
     "Countdown": 2.2,
     "Damage": 9,
+    "Expose": 1,
     "Icon": "item_brush",
-    "Desc": "点人旧伤，9 点伤害。"
+    "Desc": "9 点伤害并留下 1 层破绽。专点人身上那处旧伤。"
   },
   {
     "Id": 4,
@@ -33,7 +34,7 @@
     "Countdown": 2.6,
     "Damage": 12,
     "Icon": "item_whip",
-    "Desc": "甩出一鞭，12 点伤害。"
+    "Desc": "12 点伤害，慢但重。"
   },
   {
     "Id": 5,
@@ -42,7 +43,7 @@
     "Countdown": 1.2,
     "Damage": 5,
     "Icon": "item_dart",
-    "Desc": "扔块石头，5 点伤害。"
+    "Desc": "5 点伤害，最快的一张牌。"
   },
   {
     "Id": 6,
@@ -56,59 +57,233 @@
   },
   {
     "Id": 7,
+    "Name": "桃木剑",
+    "Type": "Attack",
+    "Countdown": 1.6,
+    "Damage": 6,
+    "Icon": "item_sword2",
+    "Desc": "6 点伤害，桃木辟邪，出手轻巧。"
+  },
+  {
+    "Id": 8,
+    "Name": "精铁剑",
+    "Type": "Attack",
+    "Countdown": 2.4,
+    "Damage": 11,
+    "Icon": "item_sword3",
+    "Desc": "11 点伤害，铁重剑沉。"
+  },
+  {
+    "Id": 9,
+    "Name": "双刀",
+    "Type": "Attack",
+    "Countdown": 1.3,
+    "Damage": 7,
+    "Icon": "item_saber2",
+    "Desc": "7 点伤害，双刀连削。"
+  },
+  {
+    "Id": 10,
+    "Name": "铁尺",
+    "Type": "Attack",
+    "Countdown": 2.0,
+    "Damage": 8,
+    "Shield": 4,
+    "Icon": "item_staff",
+    "Desc": "8 点伤害并给自己 4 点护体。"
+  },
+  {
+    "Id": 11,
+    "Name": "烈火符",
+    "Type": "Spell",
+    "Countdown": 2.6,
+    "Element": "Fire",
+    "Spell": 12,
+    "Icon": "item_talisman_atk",
+    "Desc": "火象法术，12 点火焰伤害。"
+  },
+  {
+    "Id": 12,
+    "Name": "炎爆",
+    "Type": "Spell",
+    "Countdown": 3.2,
+    "Element": "Fire",
+    "Spell": 16,
+    "Poison": 1,
+    "Icon": "item_dart3",
+    "Desc": "火象法术，16 点伤害并附 1 层中毒。"
+  },
+  {
+    "Id": 13,
+    "Name": "五雷咒",
+    "Type": "Spell",
+    "Countdown": 2.8,
+    "Element": "Thunder",
+    "Spell": 14,
+    "Icon": "item_talisman3",
+    "Desc": "雷象法术，14 点伤害。"
+  },
+  {
+    "Id": 14,
+    "Name": "冰心咒",
+    "Type": "Spell",
+    "Countdown": 2.4,
+    "Element": "Ice",
+    "Spell": 10,
+    "Shield": 8,
+    "Icon": "item_amulet",
+    "Desc": "冰象法术，10 点伤害并加 8 点护体。"
+  },
+  {
+    "Id": 15,
+    "Name": "五灵珠",
+    "Type": "Spell",
+    "Countdown": 3.0,
+    "Element": "Fire",
+    "Spell": 10,
+    "Shield": 10,
+    "Icon": "item_amulet2",
+    "Desc": "五灵归一，10 点法术伤害与 10 点护体。"
+  },
+  {
+    "Id": 16,
     "Name": "油纸伞",
     "Type": "Guard",
     "Countdown": 2.4,
     "Shield": 8,
     "Icon": "item_umbrella",
-    "Desc": "获得 12 点护体。"
+    "Desc": "8 点护体。伞面挡得住雨，也挡得住刀。"
   },
   {
-    "Id": 8,
+    "Id": 17,
     "Name": "金刚符",
     "Type": "Guard",
     "Countdown": 3.4,
     "Shield": 10,
     "Icon": "item_talisman_guard",
-    "Desc": "获得 16 点护体。"
+    "Desc": "10 点护体，符纸一烧金光护身。"
   },
   {
-    "Id": 9,
+    "Id": 18,
+    "Name": "玄铁甲",
+    "Type": "Guard",
+    "Countdown": 3.2,
+    "Shield": 12,
+    "Icon": "item_armor",
+    "Desc": "12 点护体，玄铁不轻，穿上就别想着躲。"
+  },
+  {
+    "Id": 19,
+    "Name": "软猬甲",
+    "Type": "Guard",
+    "Countdown": 2.8,
+    "Shield": 10,
+    "Icon": "item_armor2",
+    "Desc": "10 点护体，软甲贴身不碍手。"
+  },
+  {
+    "Id": 20,
+    "Name": "护腕",
+    "Type": "Guard",
+    "Countdown": 1.6,
+    "Shield": 6,
+    "Icon": "item_staff2",
+    "Desc": "6 点护体，出手前先护住手腕。"
+  },
+  {
+    "Id": 21,
     "Name": "金创药",
     "Type": "Heal",
     "Countdown": 3.0,
     "Heal": 8,
+    "Shield": 4,
     "Icon": "item_pill",
-    "Desc": "回复 10 点气血。",
-    "Shield": 4
+    "Desc": "回复 8 点气血并加 4 点护体。"
   },
   {
-    "Id": 10,
+    "Id": 22,
+    "Name": "还魂香",
+    "Type": "Heal",
+    "Countdown": 4.0,
+    "Heal": 14,
+    "Icon": "item_pill2",
+    "Desc": "回复 14 点气血，蓄势长，救命用。"
+  },
+  {
+    "Id": 23,
+    "Name": "解毒草",
+    "Type": "Heal",
+    "Countdown": 2.6,
+    "Heal": 6,
+    "Shield": 4,
+    "Icon": "item_pill3",
+    "Desc": "回复 6 点气血并加 4 点护体。"
+  },
+  {
+    "Id": 24,
+    "Name": "雄黄酒",
+    "Type": "Heal",
+    "Countdown": 3.0,
+    "Heal": 8,
+    "Damage": 4,
+    "Icon": "item_whip2",
+    "Desc": "喝一口回 8 点气血，顺手砸出 4 点伤害。"
+  },
+  {
+    "Id": 25,
     "Name": "蛇涎蛊",
     "Type": "Poison",
     "Countdown": 2.0,
     "Poison": 2,
+    "Damage": 3,
     "Icon": "item_poison",
-    "Desc": "施加 2 层中毒。",
-    "Damage": 3
+    "Desc": "3 点伤害并施加 2 层中毒。"
   },
   {
-    "Id": 11,
-    "Name": "烈火符",
-    "Type": "Attack",
+    "Id": 26,
+    "Name": "五毒散",
+    "Type": "Poison",
     "Countdown": 2.6,
-    "Fire": 12,
-    "Icon": "item_brush",
-    "Desc": "火焰 12 点伤害。"
+    "Poison": 3,
+    "Icon": "item_poison2",
+    "Desc": "3 层中毒。五毒俱全，慢工杀人。"
   },
   {
-    "Id": 12,
-    "Name": "炎爆",
+    "Id": 27,
+    "Name": "化尸水",
+    "Type": "Poison",
+    "Countdown": 3.4,
+    "Poison": 4,
+    "Icon": "item_dart",
+    "Desc": "4 层中毒，蓄势最长。"
+  },
+  {
+    "Id": 28,
+    "Name": "摄魂铃",
     "Type": "Attack",
-    "Countdown": 3.2,
-    "Fire": 16,
-    "Poison": 1,
-    "Icon": "item_dart2",
-    "Desc": "火焰 16 点伤害，附带 1 层中毒。"
+    "Countdown": 5.0,
+    "Damage": 18,
+    "Icon": "item_amulet",
+    "Desc": "18 点伤害，蓄势五秒。铃响一声，魂魄少一分。"
+  },
+  {
+    "Id": 29,
+    "Name": "玉佩",
+    "Type": "Guard",
+    "Countdown": 3.0,
+    "Shield": 8,
+    "Heal": 6,
+    "Icon": "item_amulet2",
+    "Desc": "8 点护体与 6 点回复，玉佩护身也养气。"
+  },
+  {
+    "Id": 30,
+    "Name": "蛊神像",
+    "Type": "Poison",
+    "Countdown": 3.6,
+    "Poison": 2,
+    "Shield": 8,
+    "Icon": "item_poison2",
+    "Desc": "2 层中毒并加 8 点护体，蛊神庇佑。"
   }
 ]

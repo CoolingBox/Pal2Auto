@@ -21,6 +21,9 @@ public static class UiKit
     public static readonly Color ShieldGold = new Color(0.850f, 0.710f, 0.300f);  // 守：护体
     public static readonly Color HealGreen = new Color(0.310f, 0.640f, 0.420f);   // 疗：回复
     public static readonly Color PoisonGreen = new Color(0.290f, 0.560f, 0.360f); // 毒：中毒（深绿色相，提亮一档才在黑卡面上读得清）
+    public static readonly Color IceCyan = new Color(0.370f, 0.700f, 0.780f);     // 冰：冰象法术
+    public static readonly Color ThunderLilac = new Color(0.550f, 0.610f, 0.880f);// 雷：雷象法术
+    public static readonly Color ExposeViolet = new Color(0.610f, 0.420f, 0.770f);// 破绽
 
     public static Font GameFont { get; private set; }
 

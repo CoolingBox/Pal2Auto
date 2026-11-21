@@ -336,9 +336,20 @@ public class BattlePanel : BasePanel
         }
 
         List<int> deck = new List<int>();
-        for (int id = 1; id <= 12; id++)
+        if (character != null && character.Deck != null && character.Deck.Length > 0)
         {
-            deck.Add(id);
+            for (int i = 0; i < character.Deck.Length; i++)
+            {
+                deck.Add(character.Deck[i]);
+            }
+        }
+        else
+        {
+            // 兜底：没有配牌组就用前 12 张，避免开不了战
+            for (int id = 1; id <= 12; id++)
+            {
+                deck.Add(id);
+            }
         }
 
         string portraitKey = character != null ? character.Portrait : "p01";
@@ -441,7 +452,9 @@ public class BattlePanel : BasePanel
                     break;
 
                 case BattleEventKind.Damage:
-                    Color dmgColor = evt.IsFire ? UiKit.FireOrange : UiKit.DamageRed;
+                    Color dmgColor = evt.Element == SpellElement.None
+                        ? UiKit.DamageRed
+                        : CardColors.ElementColor(evt.Element);
                     ShowFloating(evt.Side == BattleSide.Enemy ? EnemyPoint() : PlayerPoint(), "-" + evt.Value, dmgColor);
                     if (evt.Side == BattleSide.Enemy)
                     {
@@ -462,6 +475,11 @@ public class BattlePanel : BasePanel
                 case BattleEventKind.Poison:
                     ShowFloating(evt.Side == BattleSide.Enemy ? EnemyPoint() : PlayerPoint(),
                         "-" + evt.Value, UiKit.PoisonGreen);
+                    break;
+
+                case BattleEventKind.Expose:
+                    ShowFloating(evt.Side == BattleSide.Enemy ? EnemyPoint() : PlayerPoint(),
+                        "破绽 " + evt.Value, UiKit.ExposeViolet);
                     break;
 
                 case BattleEventKind.End:

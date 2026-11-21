@@ -90,10 +90,28 @@ public static class DevShot
 
     private static async void OpenBattleLater(Node host)
     {
-        GameFlow.SelectedCharacterId = 1;
+        GameFlow.SelectedCharacterId = ReadCharId();
         await host.ToSignal(host.GetTree().CreateTimer(0.3f), SceneTreeTimer.SignalName.Timeout);
         TinyFramework.UIManager.ShowPanel<BattlePanel>();
         TinyFramework.UIManager.HidePanel<MainMenuPanel>();
+    }
+
+    /// <summary>--char=N 指定进战斗时用哪位侠客（截不同牌组用）。</summary>
+    private static int ReadCharId()
+    {
+        string[] args = OS.GetCmdlineArgs();
+        for (int i = 0; i < args.Length; i++)
+        {
+            if (args[i].StartsWith("--char="))
+            {
+                int parsed;
+                if (int.TryParse(args[i].Substring(7), out parsed))
+                {
+                    return parsed;
+                }
+            }
+        }
+        return 1;
     }
 
     private static async void OpenSettingsLater(Node host)

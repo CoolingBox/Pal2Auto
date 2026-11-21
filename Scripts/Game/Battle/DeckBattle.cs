@@ -23,6 +23,7 @@ public enum BattleEventKind
     Shield,     // 获得护体（Side = 获得方）
     Heal,       // 回复（Side = 回复方）
     Poison,     // 中毒结算/叠加（Side = 受影响方）
+    Expose,     // 破绽叠层（Side = 受影响方）
     End,
 }
 
@@ -35,7 +36,7 @@ public struct BattleEvent
     public string Text;
     public CardConfig Card;
     public bool IgnoredShield;
-    public bool IsFire;
+    public SpellElement Element;   // 枚举默认值就是 None（物理伤害）
 }
 
 public sealed class HandSlot
@@ -72,6 +73,10 @@ public sealed class FighterState
     public int PoisonStacks;
     public float PoisonAccum;
 
+    /// <summary>破绽层数：每层使其受到的所有伤害 +15%，最多 3 层，4 秒后清零。</summary>
+    public int ExposeStacks;
+    public float ExposeTime;
+
     public HandSlot[] Hand;
     public List<CardConfig> DrawPile = new List<CardConfig>();
     public List<CardConfig> DiscardPile = new List<CardConfig>();
@@ -102,6 +107,10 @@ public sealed class DeckBattle
 
     /// <summary>护体上限。不封顶的话守牌会把伤害全吃掉，双方都打不死。</summary>
     public const int ShieldCap = 20;
+
+    public const int ExposeMaxStacks = 3;
+    public const float ExposeDuration = 4f;
+    public const float ExposePerStack = 0.15f;
 
     public FighterState Player = new FighterState();
     public FighterState Enemy = new FighterState();
@@ -202,8 +211,24 @@ public sealed class DeckBattle
             return;
         }
 
+        TickExpose(owner, dt);
         TickPoison(owner, dt, events);
         TickHand(owner, foe, dt, events);
+    }
+
+    private void TickExpose(FighterState owner, float dt)
+    {
+        if (owner.ExposeTime <= 0f)
+        {
+            return;
+        }
+
+        owner.ExposeTime -= dt;
+        if (owner.ExposeTime <= 0f)
+        {
+            owner.ExposeTime = 0f;
+            owner.ExposeStacks = 0;
+        }
     }
 
     private void TickPoison(FighterState owner, float dt, List<BattleEvent> events)
@@ -284,13 +309,13 @@ public sealed class DeckBattle
         if (card.Damage > 0)
         {
             int dealt = ApplyDamage(foe, card.Damage, card.IgnoreShield);
-            AddDamageEvent(owner, foe, slot, card, dealt, false, events);
+            AddDamageEvent(owner, foe, slot, card, dealt, SpellElement.None, events);
         }
 
-        if (card.Fire > 0)
+        if (card.Spell > 0)
         {
-            int burned = ApplyDamage(foe, card.Fire, false);
-            AddDamageEvent(owner, foe, slot, card, burned, true, events);
+            int spellDamage = ApplyDamage(foe, card.Spell, false);
+            AddDamageEvent(owner, foe, slot, card, spellDamage, card.Element, events);
         }
 
         if (card.Shield > 0)
@@ -324,6 +349,20 @@ public sealed class DeckBattle
             events.Add(heal);
         }
 
+        if (card.Expose > 0)
+        {
+            foe.ExposeStacks = Math.Min(ExposeMaxStacks, foe.ExposeStacks + card.Expose);
+            foe.ExposeTime = ExposeDuration;
+
+            BattleEvent expose = new BattleEvent();
+            expose.Kind = BattleEventKind.Expose;
+            expose.Side = SideOf(foe);
+            expose.Slot = slot;
+            expose.Value = foe.ExposeStacks;
+            expose.Text = "破绽 " + foe.ExposeStacks;
+            events.Add(expose);
+        }
+
         if (card.Poison > 0)
         {
             foe.PoisonStacks = Math.Min(20, foe.PoisonStacks + card.Poison);
@@ -339,15 +378,15 @@ public sealed class DeckBattle
     }
 
     private void AddDamageEvent(FighterState owner, FighterState foe, int slot, CardConfig card,
-        int hpDamage, bool isFire, List<BattleEvent> events)
+        int hpDamage, SpellElement element, List<BattleEvent> events)
     {
         BattleEvent dmg = new BattleEvent();
         dmg.Kind = BattleEventKind.Damage;
         dmg.Side = SideOf(foe);
         dmg.Slot = slot;
-        dmg.Value = hpDamage > 0 ? hpDamage : (isFire ? card.Fire : card.Damage);
+        dmg.Value = hpDamage > 0 ? hpDamage : (element != SpellElement.None ? card.Spell : card.Damage);
         dmg.IgnoredShield = card.IgnoreShield;
-        dmg.IsFire = isFire;
+        dmg.Element = element;
         dmg.Text = card.Name;
         events.Add(dmg);
 
@@ -434,6 +473,13 @@ public sealed class DeckBattle
         if (amount <= 0 || target.Hp <= 0)
         {
             return 0;
+        }
+
+        // 破绽：目标身上每层 +15% 受伤，先放大再加护体吸收
+        if (target.ExposeStacks > 0)
+        {
+            float mult = 1f + ExposePerStack * target.ExposeStacks;
+            amount = Mathf.RoundToInt(amount * mult);
         }
 
         int remaining = amount;

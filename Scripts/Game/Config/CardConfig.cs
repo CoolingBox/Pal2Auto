@@ -8,10 +8,19 @@ using TinyFramework;
 
 public enum CardType
 {
-    Attack,   // 打伤害
-    Guard,    // 加护体
-    Heal,     // 回气血
-    Poison,   // 叠中毒
+    Attack,   // 兵器：物理伤害
+    Spell,    // 法术：五灵伤害（结算同伤害，颜色按元素）
+    Guard,    // 护具：护体
+    Heal,     // 丹药：回复
+    Poison,   // 蛊毒：中毒
+}
+
+public enum SpellElement
+{
+    None,
+    Fire,     // 火
+    Ice,      // 冰
+    Thunder,  // 雷
 }
 
 public class CardConfig : BaseConfig
@@ -24,7 +33,11 @@ public class CardConfig : BaseConfig
 
     public int Damage;
     /// <summary>火焰伤害：结算方式和普通伤害一致（吃护体），只是卡面/飘字用橙黄区分。</summary>
-    public int Fire;
+    public int Spell;
+    public SpellElement Element = SpellElement.None;
+
+    /// <summary>破绽：给目标叠层，每层使其受到的所有伤害 +15%（最多 3 层，4 秒）。</summary>
+    public int Expose;
     public int Shield;
     public int Heal;
     public int Poison;

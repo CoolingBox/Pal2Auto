@@ -19,4 +19,7 @@ public class CharacterConfig : BaseConfig
     public string StarterDesc = "";
 
     public string Desc = "";
+
+    /// <summary>这位侠客开局带的 12 张牌（CardConfig.Id）。选人即选牌组。</summary>
+    public int[] Deck = new int[0];
 }

@@ -6,15 +6,14 @@ using Godot;
 
 public static class CardColors
 {
-    /// <summary>主色：按卡牌定位（Type）取，火焰牌一律橙黄。
+    /// <summary>主色：按卡牌定位（Type）取，法术按元素色。
     /// 不按"数值最大"判定——蛇涎蛊挂了 3 点伤害，但它的身份是毒，边框该是绿。</summary>
     public static Color PrimaryColor(CardConfig card)
     {
-        if (card.Fire > 0)
+        if (card.Type == CardType.Spell)
         {
-            return UiKit.FireOrange;
+            return ElementColor(card.Element);
         }
-
         if (card.Type == CardType.Guard)
         {
             return UiKit.ShieldGold;
@@ -31,7 +30,41 @@ public static class CardColors
         return UiKit.DamageRed;
     }
 
-    /// <summary>这张牌带的效果色，按"攻 → 火 → 守 → 疗 → 毒"排序。</summary>
+    public static Color ElementColor(SpellElement element)
+    {
+        if (element == SpellElement.Fire)
+        {
+            return UiKit.FireOrange;
+        }
+        if (element == SpellElement.Ice)
+        {
+            return UiKit.IceCyan;
+        }
+        if (element == SpellElement.Thunder)
+        {
+            return UiKit.ThunderLilac;
+        }
+        return UiKit.FireOrange;
+    }
+
+    public static string ElementName(SpellElement element)
+    {
+        if (element == SpellElement.Fire)
+        {
+            return "火";
+        }
+        if (element == SpellElement.Ice)
+        {
+            return "冰";
+        }
+        if (element == SpellElement.Thunder)
+        {
+            return "雷";
+        }
+        return "术";
+    }
+
+    /// <summary>这张牌带的效果色，按"攻 → 术 → 守 → 疗 → 毒 → 破"排序。</summary>
     public static Color[] EffectColors(CardConfig card)
     {
         Color[] buffer = new Color[5];
@@ -42,9 +75,9 @@ public static class CardColors
             buffer[count] = UiKit.DamageRed;
             count++;
         }
-        if (card.Fire > 0)
+        if (card.Spell > 0)
         {
-            buffer[count] = UiKit.FireOrange;
+            buffer[count] = ElementColor(card.Element);
             count++;
         }
         if (card.Shield > 0)
@@ -60,6 +93,11 @@ public static class CardColors
         if (card.Poison > 0)
         {
             buffer[count] = UiKit.PoisonGreen;
+            count++;
+        }
+        if (card.Expose > 0)
+        {
+            buffer[count] = UiKit.ExposeViolet;
             count++;
         }
 
@@ -80,9 +118,9 @@ public static class CardColors
         {
             text += Tag(UiKit.DamageRed, "攻 " + card.Damage);
         }
-        if (card.Fire > 0)
+        if (card.Spell > 0)
         {
-            text += Tag(UiKit.FireOrange, "火 " + card.Fire);
+            text += Tag(ElementColor(card.Element), ElementName(card.Element) + " " + card.Spell);
         }
         if (card.Shield > 0)
         {
@@ -95,6 +133,10 @@ public static class CardColors
         if (card.Poison > 0)
         {
             text += Tag(UiKit.PoisonGreen, "毒 " + card.Poison);
+        }
+        if (card.Expose > 0)
+        {
+            text += Tag(UiKit.ExposeViolet, "破 " + card.Expose);
         }
 
         return text.TrimEnd();
@@ -123,9 +165,9 @@ public static class CardColors
         {
             summary += "攻 " + card.Damage + "　";
         }
-        if (card.Fire > 0)
+        if (card.Spell > 0)
         {
-            summary += "火 " + card.Fire + "　";
+            summary += ElementName(card.Element) + " " + card.Spell + "　";
         }
         if (card.Shield > 0)
         {
@@ -138,6 +180,10 @@ public static class CardColors
         if (card.Poison > 0)
         {
             summary += "毒 " + card.Poison + "　";
+        }
+        if (card.Expose > 0)
+        {
+            summary += "破绽 " + card.Expose + "　";
         }
         if (card.IgnoreShield)
         {
