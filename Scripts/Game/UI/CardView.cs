@@ -104,16 +104,16 @@ public partial class CardView : Control
         _icon.Texture = UiKit.LoadTexture("res://Resources/Image/Items/" + card.Icon + ".png");
         _icon.Visible = true;
         _name.Text = card.Name;
-        _effects.Text = BuildEffectText(card);
+        _effects.Text = CardColors.BuildEffectText(card);
         _countdown.Text = card.Countdown.ToString("0.0");
 
-        Color primary = PrimaryColor(card);
+        Color primary = CardColors.PrimaryColor(card);
         _frame.AddThemeStyleboxOverride("panel",
-            UiKit.Box(Tint(new Color(0.115f, 0.100f, 0.082f), primary, 0.16f), primary, 1, 6));
+            UiKit.Box(CardColors.Tint(new Color(0.115f, 0.100f, 0.082f), primary, 0.16f), primary, 1, 6));
         _barFill.Color = primary;
 
         TooltipText = card.Name + "（蓄势 " + card.Countdown.ToString("0.0") + " 秒）\n" +
-                      EffectSummary(card) + "\n" + card.Desc;
+                      CardColors.EffectSummary(card) + "\n" + card.Desc;
     }
 
     public void SetEmpty()
@@ -171,107 +171,6 @@ public partial class CardView : Control
             _flash.Visible = false;
             _flash.Modulate = new Color(1f, 1f, 1f, 1f);
         }));
-    }
-
-    // —————————————————————————— 颜色编码 ——————————————————————————
-
-    /// <summary>彩色效果标签：一条卡面就写清"打多少、加多少、上几层毒"。</summary>
-    private static string BuildEffectText(CardConfig card)
-    {
-        string text = "";
-
-        if (card.Damage > 0)
-        {
-            text += Tag(UiKit.DamageRed, "攻 " + card.Damage);
-        }
-        if (card.Fire > 0)
-        {
-            text += Tag(UiKit.FireOrange, "火 " + card.Fire);
-        }
-        if (card.Shield > 0)
-        {
-            text += Tag(UiKit.ShieldGold, "守 " + card.Shield);
-        }
-        if (card.Heal > 0)
-        {
-            text += Tag(UiKit.HealGreen, "疗 " + card.Heal);
-        }
-        if (card.Poison > 0)
-        {
-            text += Tag(UiKit.PoisonGreen, "毒 " + card.Poison);
-        }
-
-        return text.TrimEnd();
-    }
-
-    private static string Tag(Color color, string content)
-    {
-        return "[color=#" + color.ToHtml(false) + "]" + content + "[/color]  ";
-    }
-
-    private static string EffectSummary(CardConfig card)
-    {
-        string summary = "";
-        if (card.Damage > 0)
-        {
-            summary += "攻 " + card.Damage + "　";
-        }
-        if (card.Fire > 0)
-        {
-            summary += "火 " + card.Fire + "　";
-        }
-        if (card.Shield > 0)
-        {
-            summary += "守 " + card.Shield + "　";
-        }
-        if (card.Heal > 0)
-        {
-            summary += "疗 " + card.Heal + "　";
-        }
-        if (card.Poison > 0)
-        {
-            summary += "毒 " + card.Poison + "　";
-        }
-        if (card.IgnoreShield)
-        {
-            summary += "无视护体　";
-        }
-
-        return summary.TrimEnd();
-    }
-
-    /// <summary>主色：按卡牌定位（Type）取色，火焰牌一律橙黄。
-    /// 不用"最大数值"判定——蛇涎蛊挂了 3 点伤害，但它的身份是毒，边框该是绿。</summary>
-    private static Color PrimaryColor(CardConfig card)
-    {
-        if (card.Fire > 0)
-        {
-            return UiKit.FireOrange;
-        }
-
-        if (card.Type == CardType.Guard)
-        {
-            return UiKit.ShieldGold;
-        }
-        if (card.Type == CardType.Heal)
-        {
-            return UiKit.HealGreen;
-        }
-        if (card.Type == CardType.Poison)
-        {
-            return UiKit.PoisonGreen;
-        }
-
-        return UiKit.DamageRed;
-    }
-
-    private static Color Tint(Color baseColor, Color accent, float amount)
-    {
-        return new Color(
-            baseColor.R + (accent.R - baseColor.R) * amount,
-            baseColor.G + (accent.G - baseColor.G) * amount,
-            baseColor.B + (accent.B - baseColor.B) * amount,
-            baseColor.A);
     }
 
     public override void _GuiInput(InputEvent @event)

@@ -1,10 +1,8 @@
 // 文件：DeckBattle.cs
 // 描述：卡组战斗内核（纯逻辑，不碰节点）。规则见 Docs/卡组战斗设计.md。
 //
-// 关键约定：
-//   · 手牌固定 5 个槽位，各自独立倒计时；归零即自动打出、进弃牌堆、立刻补抽一张。
-//   · 抽牌堆空则把弃牌堆洗回去；两边都空则该槽位留空，直到有牌洗回。
-//   · 敌方不做牌组，用固定三段循环的行动条（见 EnemyMove）。
+// 敌我同构：双方都是 5 张手牌 + 独立倒计时 + 打出补抽 + 弃牌堆洗回。
+// 唯一的差别是牌组内容——敌方用 EnemyConfig.Deck，玩家用 GameFlow 里选定的牌组。
 
 using System;
 using System.Collections.Generic;
@@ -19,13 +17,12 @@ public enum BattleSide
 
 public enum BattleEventKind
 {
-    Play,       // 一张牌打出（带牌面信息）
-    Draw,       // 补抽进某个槽位
-    Damage,
-    Shield,
-    Heal,
-    Poison,
-    EnemyMove,  // 敌方行动的宣告（无效果，纯提示）
+    Play,       // 一张牌打出（Side = 打出方，带 Slot 与 Card）
+    Draw,       // 补抽进某个槽位（Side = 抽牌方）
+    Damage,     // 掉血（Side = 挨打方）
+    Shield,     // 获得护体（Side = 获得方）
+    Heal,       // 回复（Side = 回复方）
+    Poison,     // 中毒结算/叠加（Side = 受影响方）
     End,
 }
 
@@ -97,21 +94,13 @@ public sealed class FighterState
     }
 }
 
-/// <summary>敌方一段行动：间隔、伤害或护盾。</summary>
-public sealed class EnemyMove
-{
-    public string Name = "";
-    public float Interval = 2.4f;
-    public int Damage;
-    public int Shield;
-}
-
 public sealed class DeckBattle
 {
     public const int HandSize = 5;
     public const float PoisonPerStackPerSecond = 1f;
     public const float TimeLimit = 60f;
-    /// <summary>护体上限。不设上限的话守牌会把伤害全吃掉，双方都打不死，战斗变成看血条不动。</summary>
+
+    /// <summary>护体上限。不封顶的话守牌会把伤害全吃掉，双方都打不死。</summary>
     public const int ShieldCap = 20;
 
     public FighterState Player = new FighterState();
@@ -122,53 +111,22 @@ public sealed class DeckBattle
     public bool PlayerWon;
 
     public float Elapsed;
-    public int PlayedCount;
-    public int EnemyMoveCount;
+    public int PlayerPlayed;
+    public int EnemyPlayed;
     public int DamageToPlayer;
+    public int DamageToEnemy;
     public int ShieldGained;
 
-    /// <summary>敌方当前招式与倒计时，UI 要显示"下一招"。</summary>
-    public EnemyMove CurrentMove;
-    public float MoveTimer;
-
-    private EnemyMove[] _moves = new EnemyMove[0];
-    private int _moveIndex;
     private readonly Random _rng = new Random();
 
-    public static DeckBattle Create(List<int> deckCardIds, int playerMaxHp, string playerName,
-        string playerPortrait, string enemyName, int enemyHp)
+    public static DeckBattle Create(string playerName, string playerPortrait, int playerHp,
+        List<int> playerDeck, string enemyName, string enemyPortrait, int enemyHp, int[] enemyDeck)
     {
         DeckBattle battle = new DeckBattle();
-
-        battle.Player = BuildFighter(playerName, playerPortrait, playerMaxHp, deckCardIds);
-        battle.Enemy = new FighterState();
-        battle.Enemy.Name = enemyName;
-        battle.Enemy.MaxHp = enemyHp;
-        battle.Enemy.Hp = enemyHp;
-        battle.Enemy.Hand = new HandSlot[0];
-
-        battle._moves = new EnemyMove[]
-        {
-            MakeMove("挥拳", 1.8f, 12, 0),
-            MakeMove("重击", 3.0f, 20, 0),
-            MakeMove("架势", 2.4f, 0, 8),
-        };
-        battle._moveIndex = 0;
-        battle.CurrentMove = battle._moves[0];
-        battle.MoveTimer = battle.CurrentMove.Interval;
-
+        battle.Player = BuildFighter(playerName, playerPortrait, playerHp, playerDeck);
+        battle.Enemy = BuildFighter(enemyName, enemyPortrait, enemyHp, new List<int>(enemyDeck));
         battle.DrawOpeningHand();
         return battle;
-    }
-
-    private static EnemyMove MakeMove(string name, float interval, int damage, int shield)
-    {
-        EnemyMove move = new EnemyMove();
-        move.Name = name;
-        move.Interval = interval;
-        move.Damage = damage;
-        move.Shield = shield;
-        return move;
     }
 
     private static FighterState BuildFighter(string name, string portrait, int maxHp, List<int> cardIds)
@@ -210,13 +168,13 @@ public sealed class DeckBattle
         }
     }
 
-    /// <summary>开局把 5 个槽位填满。</summary>
     private void DrawOpeningHand()
     {
         List<BattleEvent> ignored = new List<BattleEvent>();
         for (int slot = 0; slot < HandSize; slot++)
         {
-            DrawInto(slot, ignored);
+            DrawInto(Player, slot, ignored);
+            DrawInto(Enemy, slot, ignored);
         }
     }
 
@@ -230,46 +188,58 @@ public sealed class DeckBattle
 
         Elapsed += dt;
 
-        TickHand(dt, events);
-        TickEnemy(dt, events);
+        TickFighter(Player, Enemy, dt, events);
+        TickFighter(Enemy, Player, dt, events);
 
         CheckEnd(events);
         return events;
     }
 
-    private void TickHand(float dt, List<BattleEvent> events)
+    private void TickFighter(FighterState owner, FighterState foe, float dt, List<BattleEvent> events)
     {
-        FighterState unit = Player;
-        if (unit.Dead)
+        if (owner.Dead)
         {
             return;
         }
 
-        // 中毒：每层每秒 1 点，按累计值取整结算
-        if (unit.PoisonStacks > 0)
+        TickPoison(owner, dt, events);
+        TickHand(owner, foe, dt, events);
+    }
+
+    private void TickPoison(FighterState owner, float dt, List<BattleEvent> events)
+    {
+        if (owner.PoisonStacks <= 0)
         {
-            unit.PoisonAccum += unit.PoisonStacks * PoisonPerStackPerSecond * dt;
-            if (unit.PoisonAccum >= 1f)
-            {
-                int tick = (int)unit.PoisonAccum;
-                unit.PoisonAccum -= tick;
-                int lost = ApplyDamage(unit, tick, false);
-                if (lost > 0)
-                {
-                    BattleEvent poisonEvent = new BattleEvent();
-                    poisonEvent.Kind = BattleEventKind.Poison;
-                    poisonEvent.Side = BattleSide.Player;
-                    poisonEvent.Slot = -1;
-                    poisonEvent.Value = lost;
-                    poisonEvent.Text = "中毒 -" + lost;
-                    events.Add(poisonEvent);
-                }
-            }
+            return;
         }
 
+        owner.PoisonAccum += owner.PoisonStacks * PoisonPerStackPerSecond * dt;
+        if (owner.PoisonAccum < 1f)
+        {
+            return;
+        }
+
+        int tick = (int)owner.PoisonAccum;
+        owner.PoisonAccum -= tick;
+
+        int lost = ApplyDamage(owner, tick, false);
+        if (lost > 0)
+        {
+            BattleEvent poisonEvent = new BattleEvent();
+            poisonEvent.Kind = BattleEventKind.Poison;
+            poisonEvent.Side = SideOf(owner);
+            poisonEvent.Slot = -1;
+            poisonEvent.Value = lost;
+            poisonEvent.Text = "中毒 -" + lost;
+            events.Add(poisonEvent);
+        }
+    }
+
+    private void TickHand(FighterState owner, FighterState foe, float dt, List<BattleEvent> events)
+    {
         for (int slot = 0; slot < HandSize; slot++)
         {
-            HandSlot handSlot = unit.Hand[slot];
+            HandSlot handSlot = owner.Hand[slot];
             if (!handSlot.Occupied)
             {
                 continue;
@@ -282,22 +252,30 @@ public sealed class DeckBattle
             }
 
             CardConfig card = handSlot.Card;
-            ResolveCard(card, slot, events);
+            ResolveCard(owner, foe, card, slot, events);
 
-            unit.DiscardPile.Add(card);
+            owner.DiscardPile.Add(card);
             handSlot.Card = null;
             handSlot.Countdown = 0f;
-            PlayedCount++;
 
-            DrawInto(slot, events);
+            if (ReferenceEquals(owner, Player))
+            {
+                PlayerPlayed++;
+            }
+            else
+            {
+                EnemyPlayed++;
+            }
+
+            DrawInto(owner, slot, events);
         }
     }
 
-    private void ResolveCard(CardConfig card, int slot, List<BattleEvent> events)
+    private void ResolveCard(FighterState owner, FighterState foe, CardConfig card, int slot, List<BattleEvent> events)
     {
         BattleEvent playEvent = new BattleEvent();
         playEvent.Kind = BattleEventKind.Play;
-        playEvent.Side = BattleSide.Player;
+        playEvent.Side = SideOf(owner);
         playEvent.Slot = slot;
         playEvent.Card = card;
         playEvent.Text = card.Name;
@@ -305,37 +283,27 @@ public sealed class DeckBattle
 
         if (card.Damage > 0)
         {
-            int dealt = ApplyDamage(Enemy, card.Damage, card.IgnoreShield);
-            BattleEvent dmg = new BattleEvent();
-            dmg.Kind = BattleEventKind.Damage;
-            dmg.Side = BattleSide.Enemy;
-            dmg.Slot = slot;
-            dmg.Value = dealt > 0 ? dealt : card.Damage;
-            dmg.IgnoredShield = card.IgnoreShield;
-            dmg.Text = card.Name + " " + card.Damage;
-            events.Add(dmg);
+            int dealt = ApplyDamage(foe, card.Damage, card.IgnoreShield);
+            AddDamageEvent(owner, foe, slot, card, dealt, false, events);
         }
 
         if (card.Fire > 0)
         {
-            int burned = ApplyDamage(Enemy, card.Fire, false);
-            BattleEvent fireEvent = new BattleEvent();
-            fireEvent.Kind = BattleEventKind.Damage;
-            fireEvent.Side = BattleSide.Enemy;
-            fireEvent.Slot = slot;
-            fireEvent.Value = burned > 0 ? burned : card.Fire;
-            fireEvent.IsFire = true;
-            fireEvent.Text = card.Name + " 火 " + card.Fire;
-            events.Add(fireEvent);
+            int burned = ApplyDamage(foe, card.Fire, false);
+            AddDamageEvent(owner, foe, slot, card, burned, true, events);
         }
 
         if (card.Shield > 0)
         {
-            ShieldGained += card.Shield;
-            Player.Shield = Math.Min(ShieldCap, Player.Shield + card.Shield);
+            owner.Shield = Math.Min(ShieldCap, owner.Shield + card.Shield);
+            if (ReferenceEquals(owner, Player))
+            {
+                ShieldGained += card.Shield;
+            }
+
             BattleEvent sh = new BattleEvent();
             sh.Kind = BattleEventKind.Shield;
-            sh.Side = BattleSide.Player;
+            sh.Side = SideOf(owner);
             sh.Slot = slot;
             sh.Value = card.Shield;
             sh.Text = "护体 +" + card.Shield;
@@ -344,23 +312,25 @@ public sealed class DeckBattle
 
         if (card.Heal > 0)
         {
-            int before = Player.Hp;
-            Player.Hp = Math.Min(Player.MaxHp, Player.Hp + card.Heal);
+            int before = owner.Hp;
+            owner.Hp = Math.Min(owner.MaxHp, owner.Hp + card.Heal);
+
             BattleEvent heal = new BattleEvent();
             heal.Kind = BattleEventKind.Heal;
-            heal.Side = BattleSide.Player;
+            heal.Side = SideOf(owner);
             heal.Slot = slot;
-            heal.Value = Player.Hp - before;
-            heal.Text = "回气 +" + (Player.Hp - before);
+            heal.Value = owner.Hp - before;
+            heal.Text = "回气 +" + (owner.Hp - before);
             events.Add(heal);
         }
 
         if (card.Poison > 0)
         {
-            Enemy.PoisonStacks = Math.Min(20, Enemy.PoisonStacks + card.Poison);
+            foe.PoisonStacks = Math.Min(20, foe.PoisonStacks + card.Poison);
+
             BattleEvent poison = new BattleEvent();
             poison.Kind = BattleEventKind.Poison;
-            poison.Side = BattleSide.Enemy;
+            poison.Side = SideOf(foe);
             poison.Slot = slot;
             poison.Value = card.Poison;
             poison.Text = "中毒 +" + card.Poison;
@@ -368,120 +338,95 @@ public sealed class DeckBattle
         }
     }
 
-    /// <summary>把一个槽位补满：先抽牌堆，空了就把弃牌堆洗回去再抽。</summary>
-    private void DrawInto(int slot, List<BattleEvent> events)
+    private void AddDamageEvent(FighterState owner, FighterState foe, int slot, CardConfig card,
+        int hpDamage, bool isFire, List<BattleEvent> events)
     {
-        FighterState unit = Player;
-        if (unit.Hand[slot].Occupied)
+        BattleEvent dmg = new BattleEvent();
+        dmg.Kind = BattleEventKind.Damage;
+        dmg.Side = SideOf(foe);
+        dmg.Slot = slot;
+        dmg.Value = hpDamage > 0 ? hpDamage : (isFire ? card.Fire : card.Damage);
+        dmg.IgnoredShield = card.IgnoreShield;
+        dmg.IsFire = isFire;
+        dmg.Text = card.Name;
+        events.Add(dmg);
+
+        if (ReferenceEquals(foe, Player))
+        {
+            DamageToPlayer += hpDamage;
+        }
+        else
+        {
+            DamageToEnemy += hpDamage;
+        }
+    }
+
+    /// <summary>把一个槽位补满：先抽牌堆，空了就把弃牌堆洗回去再抽；两边都空就留空。</summary>
+    private void DrawInto(FighterState owner, int slot, List<BattleEvent> events)
+    {
+        if (owner.Hand[slot].Occupied)
         {
             return;
         }
 
-        if (unit.DrawPile.Count == 0)
+        if (owner.DrawPile.Count == 0)
         {
-            if (unit.DiscardPile.Count == 0)
+            if (owner.DiscardPile.Count == 0)
             {
-                return;   // 两边都空，槽位空着
+                return;
             }
 
-            for (int i = 0; i < unit.DiscardPile.Count; i++)
+            for (int i = 0; i < owner.DiscardPile.Count; i++)
             {
-                unit.DrawPile.Add(unit.DiscardPile[i]);
+                owner.DrawPile.Add(owner.DiscardPile[i]);
             }
-            unit.DiscardPile.Clear();
-            Shuffle(unit.DrawPile, _rng);
+            owner.DiscardPile.Clear();
+            Shuffle(owner.DrawPile, _rng);
         }
 
-        CardConfig card = unit.DrawPile[0];
-        unit.DrawPile.RemoveAt(0);
+        CardConfig card = owner.DrawPile[0];
+        owner.DrawPile.RemoveAt(0);
 
-        HandSlot handSlot = unit.Hand[slot];
+        HandSlot handSlot = owner.Hand[slot];
         handSlot.Card = card;
         handSlot.CountdownMax = card.Countdown;
         handSlot.Countdown = card.Countdown;
 
         BattleEvent draw = new BattleEvent();
         draw.Kind = BattleEventKind.Draw;
-        draw.Side = BattleSide.Player;
+        draw.Side = SideOf(owner);
         draw.Slot = slot;
         draw.Card = card;
         draw.Text = card.Name;
         events.Add(draw);
     }
 
-    private void TickEnemy(float dt, List<BattleEvent> events)
+    private BattleSide SideOf(FighterState unit)
     {
-        if (Enemy.Dead || Player.Dead)
-        {
-            return;
-        }
+        return ReferenceEquals(unit, Player) ? BattleSide.Player : BattleSide.Enemy;
+    }
 
-        // 敌方中毒也按秒结算
-        if (Enemy.PoisonStacks > 0)
+    /// <summary>敌方最先要打出的那张牌，用于"下一手"提示。</summary>
+    public CardConfig EnemyFastestCard()
+    {
+        CardConfig best = null;
+        float bestTime = float.MaxValue;
+
+        for (int i = 0; i < Enemy.Hand.Length; i++)
         {
-            Enemy.PoisonAccum += Enemy.PoisonStacks * PoisonPerStackPerSecond * dt;
-            if (Enemy.PoisonAccum >= 1f)
+            HandSlot slot = Enemy.Hand[i];
+            if (!slot.Occupied)
             {
-                int tick = (int)Enemy.PoisonAccum;
-                Enemy.PoisonAccum -= tick;
-                int lost = ApplyDamage(Enemy, tick, false);
-                if (lost > 0)
-                {
-                    BattleEvent poisonEvent = new BattleEvent();
-                    poisonEvent.Kind = BattleEventKind.Poison;
-                    poisonEvent.Side = BattleSide.Enemy;
-                    poisonEvent.Slot = -1;
-                    poisonEvent.Value = lost;
-                    poisonEvent.Text = "中毒 -" + lost;
-                    events.Add(poisonEvent);
-                }
+                continue;
+            }
+            if (slot.Countdown < bestTime)
+            {
+                bestTime = slot.Countdown;
+                best = slot.Card;
             }
         }
 
-        MoveTimer -= dt;
-        if (MoveTimer > 0f)
-        {
-            return;
-        }
-
-        EnemyMove move = CurrentMove;
-
-        BattleEvent announce = new BattleEvent();
-        announce.Kind = BattleEventKind.EnemyMove;
-        announce.Side = BattleSide.Enemy;
-        announce.Slot = -1;
-        announce.Text = move.Name;
-        events.Add(announce);
-
-        EnemyMoveCount++;
-        if (move.Damage > 0)
-        {
-            int dealt = ApplyDamage(Player, move.Damage, false);
-            DamageToPlayer += dealt;
-            BattleEvent dmg = new BattleEvent();
-            dmg.Kind = BattleEventKind.Damage;
-            dmg.Side = BattleSide.Player;
-            dmg.Slot = -1;
-            dmg.Value = dealt > 0 ? dealt : move.Damage;
-            dmg.Text = move.Name;
-            events.Add(dmg);
-        }
-
-        if (move.Shield > 0)
-        {
-            Enemy.Shield = Math.Min(ShieldCap, Enemy.Shield + move.Shield);
-            BattleEvent sh = new BattleEvent();
-            sh.Kind = BattleEventKind.Shield;
-            sh.Side = BattleSide.Enemy;
-            sh.Slot = -1;
-            sh.Value = move.Shield;
-            sh.Text = "护体 +" + move.Shield;
-            events.Add(sh);
-        }
-
-        _moveIndex = (_moveIndex + 1) % _moves.Length;
-        CurrentMove = _moves[_moveIndex];
-        MoveTimer += CurrentMove.Interval;
+        return best;
     }
 
     private static int ApplyDamage(FighterState target, int amount, bool ignoreShield)
