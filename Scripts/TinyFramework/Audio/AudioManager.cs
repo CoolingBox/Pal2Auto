@@ -137,7 +137,10 @@ public partial class AudioManager : SingletonNode<AudioManager>
         SetSFXVolume(SettingManager.Data.SFXVolume);
 
         LogBusStatus();
-        WarmupSfx();
+        // 预热按的是旧项目的命名表（hit_punch_0 / whoosh_x 等），本项目直接用仙剑2
+        // 原始音效名（slash / hit / block / ui_click ...），预热只会刷一屏"音效缺失"。
+        // 需要预热时按本项目的命名表重写 WarmupSfx 再打开。
+        // WarmupSfx();
     }
 
     /// <summary>

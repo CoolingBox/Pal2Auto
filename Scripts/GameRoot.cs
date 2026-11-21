@@ -95,8 +95,9 @@ public partial class GameRoot : SingletonNode<GameRoot>
         _screen.TextureFilter = CanvasItem.TextureFilterEnum.Nearest;
         _screen.MouseFilter = Control.MouseFilterEnum.Ignore;
         _screenLayer.AddChild(_screen);
-        _screen.SetAnchorsPreset(Control.LayoutPreset.FullRect);
-        // 进树时窗口尺寸可能还没定，先给个初值，_Process 里再跟着窗口走
+        // 不设全屏锚点：锚点会与 _Process 里的手动尺寸打架（引擎会警告 size 被覆盖），
+        // 直接按根视口尺寸摆，窗口变了在 _Process 里跟。
+        _screen.Position = Vector2.Zero;
         _screen.Size = GetViewport().GetVisibleRect().Size;
     }
 
