@@ -5,6 +5,7 @@
 
 using System.Collections.Generic;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Godot;
 
 namespace TinyFramework;
@@ -19,7 +20,9 @@ public class ConfigManager : Singleton<ConfigManager>
     private static readonly JsonSerializerOptions ConfigOptions = new()
     {
         IncludeFields = true,
-        Converters = { new BigNumJsonConverter() }, // 大数序列化为紧凑科学串,读取兼容数字字面量
+        // BigNumJsonConverter: 大数序列化为紧凑科学串,读取兼容数字字面量
+        // JsonStringEnumConverter: 表里写 "Attack" 比写 0 可读,改表不会数错枚举位
+        Converters = { new BigNumJsonConverter(), new JsonStringEnumConverter() },
     };
 
     public static T GetOne<T>(int id) where T : BaseConfig

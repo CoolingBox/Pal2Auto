@@ -1,0 +1,93 @@
+[
+  {
+    "Id": 1,
+    "Name": "长剑",
+    "Type": "Attack",
+    "Countdown": 1.8,
+    "Damage": 8,
+    "Icon": "item_sword",
+    "Desc": "劈出一剑，造成 8 点伤害。"
+  },
+  {
+    "Id": 2,
+    "Name": "柳叶刀",
+    "Type": "Attack",
+    "Countdown": 1.4,
+    "Damage": 6,
+    "Icon": "item_saber",
+    "Desc": "轻快一刀，6 点伤害。"
+  },
+  {
+    "Id": 3,
+    "Name": "判官笔",
+    "Type": "Attack",
+    "Countdown": 2.2,
+    "Damage": 9,
+    "Icon": "item_brush",
+    "Desc": "点人旧伤，9 点伤害。"
+  },
+  {
+    "Id": 4,
+    "Name": "长鞭",
+    "Type": "Attack",
+    "Countdown": 2.6,
+    "Damage": 12,
+    "Icon": "item_whip",
+    "Desc": "甩出一鞭，12 点伤害。"
+  },
+  {
+    "Id": 5,
+    "Name": "飞蝗石",
+    "Type": "Attack",
+    "Countdown": 1.2,
+    "Damage": 5,
+    "Icon": "item_dart",
+    "Desc": "扔块石头，5 点伤害。"
+  },
+  {
+    "Id": 6,
+    "Name": "梅花镖",
+    "Type": "Attack",
+    "Countdown": 2.0,
+    "Damage": 7,
+    "IgnoreShield": true,
+    "Icon": "item_dart2",
+    "Desc": "7 点伤害，无视护体。"
+  },
+  {
+    "Id": 7,
+    "Name": "油纸伞",
+    "Type": "Guard",
+    "Countdown": 2.4,
+    "Shield": 8,
+    "Icon": "item_umbrella",
+    "Desc": "获得 12 点护体。"
+  },
+  {
+    "Id": 8,
+    "Name": "金刚符",
+    "Type": "Guard",
+    "Countdown": 3.4,
+    "Shield": 10,
+    "Icon": "item_talisman_guard",
+    "Desc": "获得 16 点护体。"
+  },
+  {
+    "Id": 9,
+    "Name": "金创药",
+    "Type": "Heal",
+    "Countdown": 3.0,
+    "Heal": 8,
+    "Icon": "item_pill",
+    "Desc": "回复 10 点气血。"
+  },
+  {
+    "Id": 10,
+    "Name": "蛇涎蛊",
+    "Type": "Poison",
+    "Countdown": 2.0,
+    "Poison": 2,
+    "Icon": "item_poison",
+    "Desc": "施加 2 层中毒。"
+  }
+]

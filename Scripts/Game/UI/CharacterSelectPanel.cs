@@ -40,8 +40,6 @@ public class CharacterSelectPanel : BasePanel
     private Label _starterName;
     private Label _starterDesc;
 
-    private Control _confirmOverlay;
-    private Label _confirmText;
 
     public override void OnBind(Control control)
     {
@@ -57,10 +55,6 @@ public class CharacterSelectPanel : BasePanel
     {
         base.OnShow();
         ReloadCharacters();
-        if (_confirmOverlay != null)
-        {
-            _confirmOverlay.Visible = false;
-        }
     }
 
     private void Build()
@@ -182,47 +176,6 @@ public class CharacterSelectPanel : BasePanel
         UiKit.Place(note, 24f, 478f, 460f, 20f);
         _root.AddChild(note);
 
-        BuildConfirmOverlay();
-    }
-
-    /// <summary>确认后的提示层：摆摊界面还没做，这里给一个明确的"到此为止"，不糊弄。</summary>
-    private void BuildConfirmOverlay()
-    {
-        _confirmOverlay = new Control();
-        _confirmOverlay.Position = Vector2.Zero;
-        _confirmOverlay.Size = new Vector2(W, H);
-        _confirmOverlay.Visible = false;
-        _confirmOverlay.MouseFilter = Control.MouseFilterEnum.Stop;
-        _root.AddChild(_confirmOverlay);
-
-        ColorRect dim = new ColorRect();
-        dim.Color = new Color(0.02f, 0.02f, 0.02f, 0.72f);
-        dim.Size = new Vector2(W, H);
-        dim.MouseFilter = Control.MouseFilterEnum.Ignore;
-        _confirmOverlay.AddChild(dim);
-
-        Panel panel = new Panel();
-        panel.Position = new Vector2(280f, 170f);
-        panel.Size = new Vector2(400f, 210f);
-        panel.AddThemeStyleboxOverride("panel",
-            UiKit.Box(new Color(0.105f, 0.090f, 0.074f), new Color(0.500f, 0.400f, 0.240f), 2, 8));
-        _confirmOverlay.AddChild(panel);
-
-        _confirmText = UiKit.MakeLabel("", 16, UiKit.Paper);
-        UiKit.Place(_confirmText, 300f, 196f, 360f, 70f, HorizontalAlignment.Center);
-        _confirmText.AutowrapMode = TextServer.AutowrapMode.Arbitrary;
-        _confirmText.VerticalAlignment = VerticalAlignment.Top;
-        _confirmOverlay.AddChild(_confirmText);
-
-        Label sub = UiKit.MakeLabel("摆摊 / 打擂界面还没开始做，先把人选定下来。", 12, UiKit.Dim);
-        UiKit.Place(sub, 300f, 268f, 360f, 22f, HorizontalAlignment.Center);
-        _confirmOverlay.AddChild(sub);
-
-        Button backToMenu = UiKit.MakeButton("回 主 菜 单", true);
-        backToMenu.Position = new Vector2(380f, 306f);
-        backToMenu.Size = new Vector2(200f, 44f);
-        backToMenu.Pressed += OnBackToMenuPressed;
-        _confirmOverlay.AddChild(backToMenu);
     }
 
     private void ReloadCharacters()
@@ -309,28 +262,8 @@ public class CharacterSelectPanel : BasePanel
         AudioManager.PlayUISFX("ui_click");
         GameFlow.SelectedCharacterId = _selectedId;
 
-        CharacterConfig cfg = FindCharacter(_selectedId);
-        if (cfg != null && _confirmText != null)
-        {
-            _confirmText.Text = "已选：" + cfg.Name + "（" + cfg.Title + "）";
-        }
-
-        if (_confirmOverlay != null)
-        {
-            // 卡片是在 Build 之后动态加的，浮层要先提到最前，否则会被卡面盖住
-            _confirmOverlay.MoveToFront();
-            _confirmOverlay.Visible = true;
-        }
-    }
-
-    private void OnBackToMenuPressed()
-    {
-        AudioManager.PlayUISFX("ui_close");
-        if (_confirmOverlay != null)
-        {
-            _confirmOverlay.Visible = false;
-        }
-        UIManager.ShowPanel<MainMenuPanel>();
+        UIManager.ShowPanel<BattlePanel>();
+        UIManager.HidePanel<CharacterSelectPanel>();
     }
 
     private void OnBackPressed()

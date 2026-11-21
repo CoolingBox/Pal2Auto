@@ -20,6 +20,10 @@ public static class DevShot
             {
                 OpenSettingsLater(host);
             }
+            if (all[i] == "--ui=battle")
+            {
+                OpenBattleLater(host);
+            }
             if (all[i] == "--clicktest")
             {
                 RunClickTest(host);
@@ -82,6 +86,14 @@ public static class DevShot
         up.Position = position;
         Input.ParseInputEvent(up);
         await host.ToSignal(host.GetTree(), SceneTree.SignalName.ProcessFrame);
+    }
+
+    private static async void OpenBattleLater(Node host)
+    {
+        GameFlow.SelectedCharacterId = 1;
+        await host.ToSignal(host.GetTree().CreateTimer(0.3f), SceneTreeTimer.SignalName.Timeout);
+        TinyFramework.UIManager.ShowPanel<BattlePanel>();
+        TinyFramework.UIManager.HidePanel<MainMenuPanel>();
     }
 
     private static async void OpenSettingsLater(Node host)
