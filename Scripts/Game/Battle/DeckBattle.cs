@@ -37,6 +37,39 @@ public struct BattleEvent
     public CardConfig Card;
     public bool IgnoredShield;
     public SpellElement Element;   // 枚举默认值就是 None（物理伤害）
+
+    /// <summary>本次实际掉掉的气血。Value 是"有伤害就显示伤害"的展示值，
+    /// 护体全挡住时两者不同：记录要的是真实掉血。</summary>
+    public int HpLoss;
+
+    /// <summary>被护体吸收掉的量。负伤日志里的"挡 N"。</summary>
+    public int Absorbed;
+}
+
+/// <summary>一方的战斗统计。界面"统计"页与结算面板都读这里，不各自再算一份。</summary>
+public sealed class FightStats
+{
+    public int Played;
+    public int DamageDealt;
+    public int DamageTaken;
+    public int ShieldGained;
+    public int Healed;
+    public int PoisonDamage;
+    public int ExposeApplied;
+    public float FirstPlayAt = -1f;
+
+    /// <summary>平均每手打掉多少气血。没出手时为 0，避免除零。</summary>
+    public float AverageDamage
+    {
+        get
+        {
+            if (Played <= 0)
+            {
+                return 0f;
+            }
+            return (float)DamageDealt / Played;
+        }
+    }
 }
 
 public sealed class HandSlot
@@ -76,6 +109,8 @@ public sealed class FighterState
     /// <summary>破绽层数：每层使其受到的所有伤害 +15%，最多 3 层，4 秒后清零。</summary>
     public int ExposeStacks;
     public float ExposeTime;
+
+    public FightStats Stats = new FightStats();
 
     public HandSlot[] Hand;
     public List<CardConfig> DrawPile = new List<CardConfig>();
@@ -120,11 +155,6 @@ public sealed class DeckBattle
     public bool PlayerWon;
 
     public float Elapsed;
-    public int PlayerPlayed;
-    public int EnemyPlayed;
-    public int DamageToPlayer;
-    public int DamageToEnemy;
-    public int ShieldGained;
 
     private readonly Random _rng = new Random();
 
@@ -247,7 +277,9 @@ public sealed class DeckBattle
         int tick = (int)owner.PoisonAccum;
         owner.PoisonAccum -= tick;
 
-        int lost = ApplyDamage(owner, tick, false);
+        int absorbed;
+        int lost = ApplyDamage(owner, tick, false, out absorbed);
+        owner.Stats.PoisonDamage += lost;
         if (lost > 0)
         {
             BattleEvent poisonEvent = new BattleEvent();
@@ -283,13 +315,10 @@ public sealed class DeckBattle
             handSlot.Card = null;
             handSlot.Countdown = 0f;
 
-            if (ReferenceEquals(owner, Player))
+            owner.Stats.Played++;
+            if (owner.Stats.FirstPlayAt < 0f)
             {
-                PlayerPlayed++;
-            }
-            else
-            {
-                EnemyPlayed++;
+                owner.Stats.FirstPlayAt = Elapsed;
             }
 
             DrawInto(owner, slot, events);
@@ -308,30 +337,32 @@ public sealed class DeckBattle
 
         if (card.Damage > 0)
         {
-            int dealt = ApplyDamage(foe, card.Damage, card.IgnoreShield);
-            AddDamageEvent(owner, foe, slot, card, dealt, SpellElement.None, events);
+            int absorbed;
+            int dealt = ApplyDamage(foe, card.Damage, card.IgnoreShield, out absorbed);
+            AddDamageEvent(owner, foe, slot, card, dealt, absorbed, SpellElement.None, events);
         }
 
         if (card.Spell > 0)
         {
-            int spellDamage = ApplyDamage(foe, card.Spell, false);
-            AddDamageEvent(owner, foe, slot, card, spellDamage, card.Element, events);
+            int absorbed;
+            int spellDamage = ApplyDamage(foe, card.Spell, false, out absorbed);
+            AddDamageEvent(owner, foe, slot, card, spellDamage, absorbed, card.Element, events);
         }
 
         if (card.Shield > 0)
         {
+            // 记"实际拿到的护体"：已经顶到上限时，写 +0 比写 +8 诚实
+            int shieldBefore = owner.Shield;
             owner.Shield = Math.Min(ShieldCap, owner.Shield + card.Shield);
-            if (ReferenceEquals(owner, Player))
-            {
-                ShieldGained += card.Shield;
-            }
+            int gained = owner.Shield - shieldBefore;
+            owner.Stats.ShieldGained += gained;
 
             BattleEvent sh = new BattleEvent();
             sh.Kind = BattleEventKind.Shield;
             sh.Side = SideOf(owner);
             sh.Slot = slot;
-            sh.Value = card.Shield;
-            sh.Text = "护体 +" + card.Shield;
+            sh.Value = gained;
+            sh.Text = "护体 +" + gained;
             events.Add(sh);
         }
 
@@ -346,6 +377,7 @@ public sealed class DeckBattle
             heal.Slot = slot;
             heal.Value = owner.Hp - before;
             heal.Text = "回气 +" + (owner.Hp - before);
+            owner.Stats.Healed += owner.Hp - before;
             events.Add(heal);
         }
 
@@ -360,6 +392,7 @@ public sealed class DeckBattle
             expose.Slot = slot;
             expose.Value = foe.ExposeStacks;
             expose.Text = "破绽 " + foe.ExposeStacks;
+            owner.Stats.ExposeApplied += card.Expose;
             events.Add(expose);
         }
 
@@ -378,26 +411,22 @@ public sealed class DeckBattle
     }
 
     private void AddDamageEvent(FighterState owner, FighterState foe, int slot, CardConfig card,
-        int hpDamage, SpellElement element, List<BattleEvent> events)
+        int hpDamage, int absorbed, SpellElement element, List<BattleEvent> events)
     {
         BattleEvent dmg = new BattleEvent();
         dmg.Kind = BattleEventKind.Damage;
         dmg.Side = SideOf(foe);
         dmg.Slot = slot;
         dmg.Value = hpDamage > 0 ? hpDamage : (element != SpellElement.None ? card.Spell : card.Damage);
+        dmg.HpLoss = hpDamage;
+        dmg.Absorbed = absorbed;
         dmg.IgnoredShield = card.IgnoreShield;
         dmg.Element = element;
         dmg.Text = card.Name;
         events.Add(dmg);
 
-        if (ReferenceEquals(foe, Player))
-        {
-            DamageToPlayer += hpDamage;
-        }
-        else
-        {
-            DamageToEnemy += hpDamage;
-        }
+        owner.Stats.DamageDealt += hpDamage;
+        foe.Stats.DamageTaken += hpDamage;
     }
 
     /// <summary>把一个槽位补满：先抽牌堆，空了就把弃牌堆洗回去再抽；两边都空就留空。</summary>
@@ -468,8 +497,10 @@ public sealed class DeckBattle
         return best;
     }
 
-    private static int ApplyDamage(FighterState target, int amount, bool ignoreShield)
+    private static int ApplyDamage(FighterState target, int amount, bool ignoreShield, out int absorbed)
     {
+        absorbed = 0;
+
         if (amount <= 0 || target.Hp <= 0)
         {
             return 0;
@@ -485,7 +516,7 @@ public sealed class DeckBattle
         int remaining = amount;
         if (!ignoreShield && target.Shield > 0)
         {
-            int absorbed = Math.Min(target.Shield, remaining);
+            absorbed = Math.Min(target.Shield, remaining);
             target.Shield -= absorbed;
             remaining -= absorbed;
         }

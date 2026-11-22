@@ -16,6 +16,7 @@ public partial class CardView : Control
     private Label _name;
     private RichTextLabel _effects;
     private Label _countdown;
+    private Label _cdCaption;
     private ColorRect _barBg;
     private ColorRect _barFill;
     private ColorRect _flash;
@@ -48,40 +49,45 @@ public partial class CardView : Control
         _icon.StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered;
         _icon.MouseFilter = MouseFilterEnum.Ignore;
         AddChild(_icon);
-        _icon.Position = new Vector2(14f, 6f);
-        _icon.Size = new Vector2(Size.X - 28f, 76f);
+        _icon.Position = new Vector2(14f, 2f);
+        _icon.Size = new Vector2(Size.X - 28f, 64f);
 
-        _name = UiKit.MakeLabel("", 14, UiKit.Paper);
-        UiKit.Place(_name, 6f, 86f, Size.X - 12f, 20f, HorizontalAlignment.Center);
+        _name = UiKit.MakeLabel("", 16, UiKit.Paper);
+        UiKit.Place(_name, 6f, 64f, Size.X - 12f, 20f, HorizontalAlignment.Center);
         AddChild(_name);
 
         _effects = new RichTextLabel();
         _effects.BbcodeEnabled = true;
-        _effects.Position = new Vector2(6f, 108f);
-        _effects.Size = new Vector2(Size.X - 12f, 26f);
-        _effects.FitContent = true;
+        _effects.Position = new Vector2(6f, 84f);
+        _effects.Size = new Vector2(Size.X - 12f, 38f);
+        _effects.FitContent = false;
         _effects.ScrollActive = false;
         _effects.AutowrapMode = TextServer.AutowrapMode.Arbitrary;
         _effects.MouseFilter = MouseFilterEnum.Ignore;
         _effects.AddThemeFontOverride("normal_font", UiKit.GameFont);
-        _effects.AddThemeFontSizeOverride("normal_font_size", 12);
+        _effects.AddThemeFontSizeOverride("normal_font_size", 18);
         _effects.AddThemeConstantOverride("line_separation", 0);
         AddChild(_effects);
 
-        _countdown = UiKit.MakeLabel("", 26, UiKit.Gold);
-        UiKit.Place(_countdown, 6f, 132f, Size.X - 12f, 32f, HorizontalAlignment.Center);
+        // 倒计时上面挂一行小字：光一个 "1.1" 不说明它是多久
+        _cdCaption = UiKit.MakeLabel("蓄 势", 11, new Color(0.560f, 0.510f, 0.420f));
+        UiKit.Place(_cdCaption, 6f, 122f, Size.X - 12f, 14f, HorizontalAlignment.Center);
+        AddChild(_cdCaption);
+
+        _countdown = UiKit.MakeLabel("", 30, UiKit.Gold);
+        UiKit.Place(_countdown, 6f, 136f, Size.X - 12f, 40f, HorizontalAlignment.Center);
         AddChild(_countdown);
 
         _barBg = new ColorRect();
         _barBg.Color = new Color(0.060f, 0.055f, 0.048f);
-        _barBg.Position = new Vector2(14f, Size.Y - 22f);
+        _barBg.Position = new Vector2(14f, Size.Y - 16f);
         _barBg.Size = new Vector2(Size.X - 28f, 8f);
         _barBg.MouseFilter = MouseFilterEnum.Ignore;
         AddChild(_barBg);
 
         _barFill = new ColorRect();
         _barFill.Color = new Color(0.620f, 0.470f, 0.240f);
-        _barFill.Position = new Vector2(14f, Size.Y - 22f);
+        _barFill.Position = new Vector2(14f, Size.Y - 16f);
         _barFill.Size = new Vector2(0f, 8f);
         _barFill.MouseFilter = MouseFilterEnum.Ignore;
         AddChild(_barFill);
@@ -104,7 +110,8 @@ public partial class CardView : Control
         _icon.Texture = UiKit.LoadTexture("res://Resources/Image/Items/" + card.Icon + ".png");
         _icon.Visible = true;
         _name.Text = card.Name;
-        _effects.Text = CardColors.BuildEffectText(card);
+        _effects.Text = "[center]" + CardColors.BuildEffectText(card) + "[/center]";
+        _cdCaption.Visible = true;
         _countdown.Text = card.Countdown.ToString("0.0");
 
         Color primary = CardColors.PrimaryColor(card);
@@ -126,6 +133,7 @@ public partial class CardView : Control
         _name.Text = "";
         _effects.Text = "";
         _countdown.Text = "";
+        _cdCaption.Visible = false;
         _barFill.Size = new Vector2(0f, 8f);
         _barFill.Color = new Color(0.620f, 0.470f, 0.240f);
         TooltipText = "";

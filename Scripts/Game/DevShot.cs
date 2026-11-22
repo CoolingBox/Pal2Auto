@@ -7,6 +7,20 @@ using Godot;
 
 public static class DevShot
 {
+    /// <summary>命令行里有没有这个参数。调试开关散在各面板时，统一走这里查。</summary>
+    public static bool HasArg(string key)
+    {
+        string[] args = OS.GetCmdlineArgs();
+        for (int i = 0; i < args.Length; i++)
+        {
+            if (args[i] == key)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public static void RunIfRequested(Node host)
     {
         string[] all = OS.GetCmdlineArgs();
@@ -27,6 +41,10 @@ public static class DevShot
             if (all[i] == "--clicktest")
             {
                 RunClickTest(host);
+            }
+            if (all[i] == "--clicklog")
+            {
+                RunLogClickTest(host);
             }
         }
 
@@ -86,6 +104,26 @@ public static class DevShot
         up.Position = position;
         Input.ParseInputEvent(up);
         await host.ToSignal(host.GetTree(), SceneTree.SignalName.ProcessFrame);
+    }
+
+    /// <summary>真实鼠标点一遍：进战斗 → 开交战记录 → 切统计页。</summary>
+    private static async void RunLogClickTest(Node host)
+    {
+        await host.ToSignal(host.GetTree().CreateTimer(0.5f), SceneTreeTimer.SignalName.Timeout);
+
+        GameFlow.SelectedCharacterId = ReadCharId();
+        TinyFramework.UIManager.ShowPanel<BattlePanel>();
+        TinyFramework.UIManager.HidePanel<MainMenuPanel>();
+
+        await host.ToSignal(host.GetTree().CreateTimer(1.2f), SceneTreeTimer.SignalName.Timeout);
+
+        Vector2 scale = host.GetViewport().GetVisibleRect().Size / new Vector2(960f, 540f);
+
+        await ClickAt(host, new Vector2(872f, 21f) * scale);
+        await host.ToSignal(host.GetTree().CreateTimer(0.4f), SceneTreeTimer.SignalName.Timeout);
+
+        await ClickAt(host, new Vector2(164f, 103f) * scale);
+        GD.Print("CLICKLOG 已点击：交战记录开关 / 统计页");
     }
 
     private static async void OpenBattleLater(Node host)

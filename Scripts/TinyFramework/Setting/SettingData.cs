@@ -28,4 +28,8 @@ public class SettingData : SaveData
     /// 开：960×540 离屏画布 → 放大到窗口，像素块的对角被磨圆；
     /// 关：直接按窗口分辨率渲染，字形最锐利。</summary>
     public bool XbrzEnabled = true;
+
+    /// <summary>战斗里是否展开"交手记录"抽屉。
+    /// 默认关：记录是查账用的，常驻会把牌阵挡住。开了就记住，下次进战斗仍然开着。</summary>
+    public bool BattleLogEnabled = false;
 }

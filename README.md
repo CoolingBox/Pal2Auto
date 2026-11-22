@@ -26,6 +26,10 @@ dotnet build
 4. 抽牌堆空了把弃牌堆洗回去；两边都空则该位留空
 5. 敌方也是牌组（5 张手牌 + 独立倒计时），UI 上能看到它手上的牌与"下一手"
 
+**界面**：上下对峙——敌在上、我在下，两排牌阵夹在中间；卡面上的效果数值放大到 18px、
+倒计时 30px 并标"蓄势"。右上角「交战记录」是可选抽屉（默认关闭），
+明细逐行写时间/牌名/真实掉血/被护体挡住多少，统计页给双方出手次数、均伤、直伤、承伤、毒伤等。
+
 规则细节与数值取舍见 `Docs/卡组战斗设计.md`。
 
 ---
@@ -41,7 +45,7 @@ Scripts/
     Battle/DeckBattle.cs     卡组战斗内核（纯逻辑，不碰节点）
     UI/                      UiKit / CardView / MainMenuPanel / CharacterSelectPanel
                              / BattlePanel / SettingsPanel
-    DevShot.cs               --shot / --ui=battle|select|settings 等开发开关
+    DevShot.cs               --shot / --ui=battle|select|settings / --log[=stats] 等开发开关
   TinyFramework/             单例 / UIManager / 存档 / 配置表 / 音频（已清掉旧项目注释）
 Resources/
   Config/                    CharacterConfig.json / CardConfig.json / PortraitManifest.json
