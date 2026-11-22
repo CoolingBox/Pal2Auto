@@ -987,11 +987,13 @@ public class BattlePanel : BasePanel
         _playerStatus.Text = BuildStatus(p);
         _enemyStatus.Text = BuildStatus(e);
 
-        _playerMeta.Text = "已出 " + p.Stats.Played + " 张　上场 " + p.ActiveSlots;
+        _playerMeta.Text = "已出 " + p.Stats.Played + " 张　上场 " + p.ActiveSlots +
+                           (p.PendingHandRevert ? "（出牌时收）" : "");
 
         CardConfig intent = _battle.EnemyFastestCard();
         string next = intent != null ? intent.Name : "—";
-        _enemyIntent.Text = "上场 " + e.ActiveSlots + "　下一手：" + next;
+        _enemyIntent.Text = "上场 " + e.ActiveSlots + (e.PendingHandRevert ? "（待收）" : "") +
+                            "　下一手：" + next;
 
         // 抽牌堆不露牌面（牌序由内核决定，露了就剧透）；弃牌堆露出最后进去那张
         _enemyDraw.SetPile("抽牌堆", e.DrawPile.Count, e.DrawPile, false, new Color(0.520f, 0.420f, 0.260f));

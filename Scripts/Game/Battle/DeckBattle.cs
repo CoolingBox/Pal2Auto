@@ -121,6 +121,9 @@ public sealed class FighterState
     /// <summary>当前上场数（手牌槽位数）。基础 5，可被卡牌临时或本场改写。</summary>
     public int HandCapacity = DeckBattle.HandBase;
 
+    /// <summary>有限时上场加成已经到期、但还没收（等到本方打出下一张牌才收）。界面要提示这个状态。</summary>
+    public bool PendingHandRevert;
+
     /// <summary>实际参与推进的槽位数。</summary>
     public int ActiveSlots
     {
@@ -192,6 +195,9 @@ public sealed class DeckBattle
         public FighterState Target;
         public int Applied;
         public float Remain;
+
+        /// <summary>时间到了但还没收：等到本方打出下一张牌才真正减。</summary>
+        public bool Expired;
     }
 
     private readonly List<HandModifier> _handMods = new List<HandModifier>();
@@ -271,7 +277,7 @@ public sealed class DeckBattle
 
         Elapsed += dt;
 
-        TickHandMods(dt, events);
+        TickHandMods(dt);
         TickFighter(Player, Enemy, dt, events);
         TickFighter(Enemy, Player, dt, events);
 
@@ -291,21 +297,59 @@ public sealed class DeckBattle
         TickHand(owner, foe, dt, events);
     }
 
-    private void TickHandMods(float dt, List<BattleEvent> events)
+    private void TickHandMods(float dt)
     {
-        for (int i = _handMods.Count - 1; i >= 0; i--)
+        for (int i = 0; i < _handMods.Count; i++)
         {
             HandModifier mod = _handMods[i];
+            if (mod.Expired)
+            {
+                continue;
+            }
+
             mod.Remain -= dt;
             if (mod.Remain > 0f)
             {
                 continue;
             }
 
-            // 到期收回：只收回当初真正加上去的量（可能被上限截断过）
+            // 只标记到期，不动槽位：要等本方打出下一张牌才收（见 RevertExpiredMods）。
+            // 理由：一到期就把牌抽走，玩家会看到"我什么都还没干，位置就少了一个"，
+            // 手上那张刚要出手的牌也跟着消失，体验像是被系统抢了一下。
+            mod.Expired = true;
+            mod.Target.PendingHandRevert = true;
+        }
+    }
+
+    /// <summary>把本方已到期的限时加成收掉。只有在本方确实打出过牌之后才调用。</summary>
+    private void RevertExpiredMods(FighterState owner, List<BattleEvent> events)
+    {
+        for (int i = _handMods.Count - 1; i >= 0; i--)
+        {
+            HandModifier mod = _handMods[i];
+            if (mod.Target != owner || !mod.Expired)
+            {
+                continue;
+            }
+
+            // 只收回当初真正加上去的量（可能被上限截断过）
             ApplyCapacity(mod.Target, -mod.Applied, events, true);
             _handMods.RemoveAt(i);
         }
+
+        owner.PendingHandRevert = HasExpiredMod(owner);
+    }
+
+    private bool HasExpiredMod(FighterState owner)
+    {
+        for (int i = 0; i < _handMods.Count; i++)
+        {
+            if (_handMods[i].Target == owner && _handMods[i].Expired)
+            {
+                return true;
+            }
+        }
+        return false;
     }
 
     /// <summary>
@@ -410,6 +454,7 @@ public sealed class DeckBattle
 
     private void TickHand(FighterState owner, FighterState foe, float dt, List<BattleEvent> events)
     {
+        bool playedAny = false;
         int activeSlots = owner.ActiveSlots;
         for (int slot = 0; slot < activeSlots; slot++)
         {
@@ -438,7 +483,14 @@ public sealed class DeckBattle
                 owner.Stats.FirstPlayAt = Elapsed;
             }
 
+            playedAny = true;
+
             DrawInto(owner, slot, events);
+        }
+
+        if (playedAny)
+        {
+            RevertExpiredMods(owner, events);
         }
     }
 
@@ -523,6 +575,11 @@ public sealed class DeckBattle
                 mod.Applied = applied;
                 mod.Remain = card.HandTime;
                 _handMods.Add(mod);
+            }
+            else if (applied > 0)
+            {
+                // 本场持续的加成把之前到期待收的状态盖过去了
+                owner.PendingHandRevert = HasExpiredMod(owner);
             }
         }
 
