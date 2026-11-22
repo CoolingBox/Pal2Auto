@@ -86,6 +86,12 @@ public class BattlePanel : BasePanel
     private UiBar _playerBar;
     private UiBar _enemyBar;
 
+    // 四堆牌：双方各一副抽牌堆 + 弃牌堆，摆在各自信息栏外侧
+    private PileView _enemyDraw;
+    private PileView _enemyDiscard;
+    private PileView _playerDraw;
+    private PileView _playerDiscard;
+
     // —— 记录 ——
     private readonly List<string> _logLines = new List<string>();
     private bool _showLog;
@@ -164,6 +170,7 @@ public class BattlePanel : BasePanel
         BuildEnemyHand();
         BuildPlayerHand();
         BuildPlayerBlock();
+        BuildPiles();
         BuildLogDrawer();
         BuildLogToggle();
         BuildResultOverlay();
@@ -299,13 +306,34 @@ public class BattlePanel : BasePanel
         }
     }
 
+    /// <summary>
+    /// 四堆牌：敌方两堆贴在其信息栏右侧，我方两堆贴在我方信息栏右侧。
+    /// 牌堆必须"看得见"——只写一行"抽 3 / 弃 5"，玩家没法判断还剩几张、弃了什么。
+    /// </summary>
+    private void BuildPiles()
+    {
+        _enemyDraw = MakePile(798f, 8f);
+        _enemyDiscard = MakePile(874f, 8f);
+        _playerDraw = MakePile(798f, 450f);
+        _playerDiscard = MakePile(874f, 450f);
+    }
+
+    private PileView MakePile(float x, float y)
+    {
+        PileView pile = new PileView();
+        pile.Position = new Vector2(x, y);
+        pile.Size = new Vector2(68f, 76f);
+        _root.AddChild(pile);
+        return pile;
+    }
+
     // —————————————————————————— 交手记录（可选抽屉）——————————————————————————
 
     private void BuildLogToggle()
     {
         _logToggle = UiKit.MakeButton("交战记录 · 关", false);
-        _logToggle.Position = new Vector2(796f, 6f);
-        _logToggle.Size = new Vector2(152f, 30f);
+        _logToggle.Position = new Vector2(8f, 6f);
+        _logToggle.Size = new Vector2(132f, 30f);
         _logToggle.AddThemeFontSizeOverride("font_size", 13);
         _logToggle.Pressed += OnToggleLog;
         _root.AddChild(_logToggle);
@@ -896,10 +924,14 @@ public class BattlePanel : BasePanel
         _playerStatus.Text = BuildStatus(p);
         _enemyStatus.Text = BuildStatus(e);
 
-        _playerPiles.Text = "抽 " + p.DrawPile.Count + " / 弃 " + p.DiscardPile.Count +
-                            "　已出 " + p.Stats.Played;
-        _enemyPiles.Text = "抽 " + e.DrawPile.Count + " / 弃 " + e.DiscardPile.Count +
-                           "　已出 " + e.Stats.Played;
+        _playerPiles.Text = "已出 " + p.Stats.Played + " 张";
+        _enemyPiles.Text = "已出 " + e.Stats.Played + " 张";
+
+        // 抽牌堆不露牌面（牌序由内核决定，露了就剧透）；弃牌堆露出最后进去那张
+        _enemyDraw.SetPile("抽牌堆", e.DrawPile.Count, e.DrawPile, false, new Color(0.520f, 0.420f, 0.260f));
+        _enemyDiscard.SetPile("弃牌堆", e.DiscardPile.Count, e.DiscardPile, true, new Color(0.360f, 0.320f, 0.260f));
+        _playerDraw.SetPile("抽牌堆", p.DrawPile.Count, p.DrawPile, false, new Color(0.560f, 0.460f, 0.280f));
+        _playerDiscard.SetPile("弃牌堆", p.DiscardPile.Count, p.DiscardPile, true, new Color(0.400f, 0.350f, 0.280f));
 
         CardConfig intent = _battle.EnemyFastestCard();
         if (intent != null)
