@@ -148,21 +148,25 @@ public static class CardColors
         {
             text += Tag(UiKit.MultiMagenta, "重" + card.MultiCount);
         }
-        if (card.HasteCount > 0)
+        // 时机标签一律带范围前缀（我 / 敌 / 双），张数为 0 写"全"——卡面自己说清楚打给谁
+        if (card.HasteTime > 0f)
         {
-            text += Tag(UiKit.HasteGreen, "速" + card.HasteCount + "·" + Short(card.HasteTime) + "s");
+            text += Tag(UiKit.HasteGreen,
+                ScopeWord(card.Scope) + "速" + Amount(card.HasteCount) + "·" + Short(card.HasteTime) + "s");
         }
-        if (card.SlowCount > 0)
+        if (card.SlowTime > 0f)
         {
-            text += Tag(UiKit.SlowBlue, "缓" + card.SlowCount + "·" + Short(card.SlowTime) + "s");
+            text += Tag(UiKit.SlowBlue,
+                ScopeWord(card.Scope) + "缓" + Amount(card.SlowCount) + "·" + Short(card.SlowTime) + "s");
         }
-        if (card.FreezeCount > 0)
+        if (card.FreezeTime > 0f)
         {
-            text += Tag(UiKit.FreezeIce, "冻" + card.FreezeCount + "·" + Short(card.FreezeTime) + "s");
+            text += Tag(UiKit.FreezeIce,
+                ScopeWord(card.Scope) + "冻" + Amount(card.FreezeCount) + "·" + Short(card.FreezeTime) + "s");
         }
-        if (card.ChargeCount > 0)
+        if (card.HasKeyword(CardKeyword.Charge))
         {
-            text += Tag(UiKit.ChargeGold, "充" + card.ChargeCount);
+            text += Tag(UiKit.ChargeGold, ScopeWord(card.Scope) + "充" + Amount(card.ChargeCount));
         }
 
         if (card.HandSelf != 0 || card.HandFoe != 0)
@@ -226,6 +230,52 @@ public static class CardColors
         return body;
     }
 
+    private static string ScopeName(TimingScope scope)
+    {
+        if (scope == TimingScope.Foe)
+        {
+            return "敌方";
+        }
+        if (scope == TimingScope.Both)
+        {
+            return "双方";
+        }
+        return "我方";
+    }
+
+    private static string CountName(int count)
+    {
+        if (count <= 0)
+        {
+            return "全体";
+        }
+        return count + " 张";
+    }
+
+    /// <summary>范围前缀：我 / 敌 / 双。</summary>
+    public static string ScopeWord(TimingScope scope)
+    {
+        if (scope == TimingScope.Foe)
+        {
+            return "敌";
+        }
+        if (scope == TimingScope.Both)
+        {
+            return "双";
+        }
+        return "我";
+    }
+
+    /// <summary>张数，0 表示该范围全体。</summary>
+    public static string Amount(int count)
+    {
+        if (count <= 0)
+        {
+            return "全";
+        }
+        return count.ToString();
+    }
+
     /// <summary>秒数去掉多余的 .0：6 秒写 "6"，2.5 秒写 "2.5"。</summary>
     private static string Short(float seconds)
     {
@@ -264,21 +314,24 @@ public static class CardColors
         {
             summary += "多重 " + card.MultiCount + "　";
         }
-        if (card.HasteCount > 0)
+        if (card.HasteTime > 0f)
         {
-            summary += "加速 " + card.HasteCount + " 张 " + Short(card.HasteTime) + " 秒　";
+            summary += ScopeName(card.Scope) + "加速 " + CountName(card.HasteCount) + " " +
+                       Short(card.HasteTime) + " 秒　";
         }
-        if (card.SlowCount > 0)
+        if (card.SlowTime > 0f)
         {
-            summary += "减速 " + card.SlowCount + " 张 " + Short(card.SlowTime) + " 秒　";
+            summary += ScopeName(card.Scope) + "减速 " + CountName(card.SlowCount) + " " +
+                       Short(card.SlowTime) + " 秒　";
         }
-        if (card.FreezeCount > 0)
+        if (card.FreezeTime > 0f)
         {
-            summary += "冰冻 " + card.FreezeCount + " 张 " + Short(card.FreezeTime) + " 秒　";
+            summary += ScopeName(card.Scope) + "冰冻 " + CountName(card.FreezeCount) + " " +
+                       Short(card.FreezeTime) + " 秒　";
         }
-        if (card.ChargeCount > 0)
+        if (card.HasKeyword(CardKeyword.Charge))
         {
-            summary += "充能 " + card.ChargeCount + " 张　";
+            summary += ScopeName(card.Scope) + "充能 " + CountName(card.ChargeCount) + "　";
         }
         if (card.HandSelf != 0 || card.HandFoe != 0)
         {

@@ -742,59 +742,67 @@ public sealed class DeckBattle
     }
 
     /// <summary>
-    /// 时机类效果。归属按"它该帮谁"来定：
-    /// 加速 / 充能作用于**自己**（帮自己更快出手）；
-    /// 减速 / 冰冻作用于**对面**（压住对方的出手节奏）。
-    /// 减速与加速互为反面，同时存在时速度相乘，2×0.5=1，正好抵消。
-    /// 张数不足时按实际有的张数生效，不空放。
+    /// 时机类效果。作用范围由卡片的 Scope 决定：自己 / 敌方 / 双方；
+    /// 张数为 0 表示"该范围内全体"。减速与加速互为反面，同时存在时速度相乘（2×0.5=1，正好抵消）。
+    /// 打出的这张牌本身永远不参与——否则一张加速符会先给自己加速，然后立刻被消耗掉。
     /// </summary>
-    private void ApplyTimingEffects(FighterState owner, FighterState foe, CardConfig card, int playingSlot, List<BattleEvent> events)
+    private void ApplyTimingEffects(FighterState owner, FighterState foe, CardConfig card, int playingSlot,
+        List<BattleEvent> events)
     {
-        if (card.HasteCount > 0 && card.HasteTime > 0f)
+        bool hitSelf = card.Scope == TimingScope.Self || card.Scope == TimingScope.Both;
+        bool hitFoe = card.Scope == TimingScope.Foe || card.Scope == TimingScope.Both;
+
+        if (card.HasteTime > 0f)
         {
             float time = card.HasteTime;
-            int applied = ApplyToRandomSlots(owner, playingSlot, card.HasteCount,
-                delegate (HandSlot target)
-                {
-                    target.HasteTime = Mathf.Max(target.HasteTime, time);
-                });
-            AddTimingEvent(events, owner, BattleEventKind.Haste, applied, time);
+            ApplyTimingSide(owner, foe, playingSlot, card.HasteCount, hitSelf, hitFoe,
+                events, BattleEventKind.Haste, time,
+                delegate (HandSlot target) { target.HasteTime = Mathf.Max(target.HasteTime, time); });
         }
 
-        if (card.SlowCount > 0 && card.SlowTime > 0f)
+        if (card.SlowTime > 0f)
         {
             float time = card.SlowTime;
-            int applied = ApplyToRandomSlots(foe, -1, card.SlowCount,
-                delegate (HandSlot target)
-                {
-                    target.SlowTime = Mathf.Max(target.SlowTime, time);
-                });
-            AddTimingEvent(events, foe, BattleEventKind.Slow, applied, time);
+            ApplyTimingSide(owner, foe, playingSlot, card.SlowCount, hitSelf, hitFoe,
+                events, BattleEventKind.Slow, time,
+                delegate (HandSlot target) { target.SlowTime = Mathf.Max(target.SlowTime, time); });
         }
 
-        if (card.FreezeCount > 0 && card.FreezeTime > 0f)
+        if (card.FreezeTime > 0f)
         {
             float time = card.FreezeTime;
-            int applied = ApplyToRandomSlots(foe, -1, card.FreezeCount,
-                delegate (HandSlot target)
-                {
-                    target.FreezeTime = Mathf.Max(target.FreezeTime, time);
-                });
-            AddTimingEvent(events, foe, BattleEventKind.Freeze, applied, time);
+            ApplyTimingSide(owner, foe, playingSlot, card.FreezeCount, hitSelf, hitFoe,
+                events, BattleEventKind.Freeze, time,
+                delegate (HandSlot target) { target.FreezeTime = Mathf.Max(target.FreezeTime, time); });
         }
 
-        if (card.ChargeCount > 0)
+        if (card.HasKeyword(CardKeyword.Charge))
         {
-            int applied = ApplyToRandomSlots(owner, playingSlot, card.ChargeCount,
-                delegate (HandSlot target)
-                {
-                    // 充能是直接推蓄势条，冰冻中也生效
-                    target.Countdown = Mathf.Max(0f, target.Countdown - 1f);
-                });
-            AddTimingEvent(events, owner, BattleEventKind.Charge, applied, 0f);
+            ApplyTimingSide(owner, foe, playingSlot, card.ChargeCount, hitSelf, hitFoe,
+                events, BattleEventKind.Charge, 0f,
+                delegate (HandSlot target) { target.Countdown = Mathf.Max(0f, target.Countdown - 1f); });
         }
     }
 
+    /// <summary>按范围把同一个效果派给两边，各自发事件（记录里能看出是谁中了）。</summary>
+    private void ApplyTimingSide(FighterState owner, FighterState foe, int playingSlot, int count,
+        bool hitSelf, bool hitFoe, List<BattleEvent> events, BattleEventKind kind, float duration,
+        System.Action<HandSlot> apply)
+    {
+        if (hitSelf)
+        {
+            int appliedSelf = ApplyToRandomSlots(owner, playingSlot, count, apply);
+            AddTimingEvent(events, owner, kind, appliedSelf, duration);
+        }
+
+        if (hitFoe)
+        {
+            int appliedFoe = ApplyToRandomSlots(foe, -1, count, apply);
+            AddTimingEvent(events, foe, kind, appliedFoe, duration);
+        }
+    }
+
+    /// <summary>在自己这一侧的槽位里随机挑 count 个施加效果；count 为 0 表示全体。</summary>
     private int ApplyToRandomSlots(FighterState owner, int excludeSlot, int count, System.Action<HandSlot> apply)
     {
         List<int> candidates = new List<int>();
@@ -820,8 +828,10 @@ public sealed class DeckBattle
             candidates[j] = tmp;
         }
 
+        int limit = count > 0 ? count : candidates.Count;
+
         int applied = 0;
-        for (int i = 0; i < candidates.Count && applied < count; i++)
+        for (int i = 0; i < candidates.Count && applied < limit; i++)
         {
             apply(owner.Hand[candidates[i]]);
             applied++;

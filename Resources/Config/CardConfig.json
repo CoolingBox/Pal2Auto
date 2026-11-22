@@ -370,7 +370,8 @@
     "HasteTime": 6,
     "Keywords": "Exhaust",
     "Icon": "item_talisman4",
-    "Desc": "符纸一燃，两步并作一步。我方随机 2 张牌，六秒内蓄势速度翻倍。"
+    "Desc": "符纸一燃，两步并作一步。我方随机 2 张牌，六秒内蓄势速度翻倍。",
+    "Scope": "Self"
   },
   {
     "Id": 38,
@@ -380,7 +381,8 @@
     "ChargeCount": 3,
     "Keywords": "Exhaust",
     "Icon": "item_pill4",
-    "Desc": "丹入腹中，气随意走。我方随机 3 张牌立刻各前进一秒。"
+    "Desc": "丹入腹中，气随意走。我方随机 3 张牌立刻各前进一秒。",
+    "Scope": "Self"
   },
   {
     "Id": 39,
@@ -391,7 +393,8 @@
     "SlowTime": 5,
     "Keywords": "Exhaust",
     "Icon": "item_dart5",
-    "Desc": "三枚铁钉钉在地上走不动的脚。我方随机 2 张牌，五秒内蓄势减半。"
+    "Desc": "三枚铁钉钉住对方的脚。敌方随机 2 张牌，五秒内蓄势减半。",
+    "Scope": "Foe"
   },
   {
     "Id": 40,
@@ -402,7 +405,8 @@
     "FreezeTime": 4,
     "Keywords": "Exhaust",
     "Icon": "item_talisman5",
-    "Desc": "寒气封住经脉。我方随机 2 张牌，四秒内不能自然蓄势，化冻后才打得出（可被充能）。"
+    "Desc": "寒气封住对方经脉。敌方随机 2 张牌四秒内不能自然蓄势，化冻前打不出（可被充能）。",
+    "Scope": "Foe"
   },
   {
     "Id": 41,
@@ -424,8 +428,33 @@
     "ChargeCount": 2,
     "Keywords": "Exhaust",
     "Icon": "item_talisman6",
-    "Desc": "掌心雷落地成令。造成 8 点雷伤，我方随机 1 张牌四秒内双倍蓄势，另 2 张各前进一秒。",
+    "Desc": "掌心雷落地成令。造成 8 点雷伤；我方随机 1 张牌四秒内双倍蓄势，另 2 张各前进一秒。",
     "Element": "Thunder",
-    "Spell": 8
+    "Spell": 8,
+    "Scope": "Self"
+  },
+  {
+    "Id": 43,
+    "Name": "号令三军",
+    "Type": "Support",
+    "Countdown": 4.2,
+    "Scope": "Self",
+    "HasteCount": 0,
+    "HasteTime": 5,
+    "Keywords": "Exhaust",
+    "Icon": "item_talisman7",
+    "Desc": "旗一展，全队脚下生风。我方全体牌，五秒内蓄势速度翻倍。"
+  },
+  {
+    "Id": 44,
+    "Name": "冰封千里",
+    "Type": "Support",
+    "Countdown": 4.6,
+    "Scope": "Both",
+    "FreezeCount": 0,
+    "FreezeTime": 3,
+    "Keywords": "Exhaust",
+    "Icon": "item_talisman8",
+    "Desc": "寒气不分敌我。双方全体牌冰冻三秒——包括自己那几张。"
   }
 ]

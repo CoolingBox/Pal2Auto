@@ -47,6 +47,14 @@ public enum CardKeyword
     Multi = 128,
 }
 
+/// <summary>时机效果的作用范围。张数为 0 时表示"范围内全体"。</summary>
+public enum TimingScope
+{
+    Self,   // 自己
+    Foe,    // 敌方
+    Both,   // 双方各取
+}
+
 public enum SpellElement
 {
     None,
@@ -85,6 +93,10 @@ public class CardConfig : BaseConfig
     public float HandTime;
 
     // —— 时机类（影响蓄势速度）——
+
+    /// <summary>时机效果的作用范围：自己 / 敌方 / 双方。卡面会把范围写在标签最前面。</summary>
+    public TimingScope Scope = TimingScope.Self;
+
     /// <summary>加速：影响几张牌。</summary>
     public int HasteCount;
     /// <summary>加速：双倍蓄势持续几秒。</summary>

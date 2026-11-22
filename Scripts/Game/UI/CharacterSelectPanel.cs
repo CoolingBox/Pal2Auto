@@ -175,8 +175,8 @@ public class CharacterSelectPanel : BasePanel
     /// <summary>12 个牌位按 6 列 2 行摆开：一眼看出这套牌是快是慢、攻多还是守多。</summary>
     private void AddChildIcon(TextureRect icon, int index)
     {
-        int col = index % 7;
-        int row = index / 7;
+        int col = index % 8;
+        int row = index / 8;
         _root.AddChild(icon);
         icon.Position = new Vector2(DetailX + 16f + col * 30f, DetailY + 240f + row * 30f);
         icon.Size = new Vector2(28f, 28f);

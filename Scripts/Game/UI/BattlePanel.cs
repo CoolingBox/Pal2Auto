@@ -766,21 +766,25 @@ public class BattlePanel : BasePanel
                     break;
 
                 case BattleEventKind.Haste:
-                    AppendDetail(C(UiKit.HasteGreen, "速" + evt.Value + "·" + ShortTime(evt.Duration) + "s"));
+                    AppendDetail(C(UiKit.HasteGreen, WhoTag(evt.Side) + "速" +
+                        CardColors.Amount(evt.Value) + "·" + ShortTime(evt.Duration) + "s"));
                     break;
 
                 case BattleEventKind.Slow:
-                    AppendDetail(C(UiKit.SlowBlue, "缓" + evt.Value + "·" + ShortTime(evt.Duration) + "s"));
+                    AppendDetail(C(UiKit.SlowBlue, WhoTag(evt.Side) + "缓" +
+                        CardColors.Amount(evt.Value) + "·" + ShortTime(evt.Duration) + "s"));
                     break;
 
                 case BattleEventKind.Freeze:
-                    AppendDetail(C(UiKit.FreezeIce, "冻" + evt.Value + "·" + ShortTime(evt.Duration) + "s"));
+                    AppendDetail(C(UiKit.FreezeIce, WhoTag(evt.Side) + "冻" +
+                        CardColors.Amount(evt.Value) + "·" + ShortTime(evt.Duration) + "s"));
                     ShowFloating(evt.Side == BattleSide.Enemy ? EnemyPoint() : PlayerPoint(),
-                        "冰冻 " + evt.Value + " 张", UiKit.FreezeIce);
+                        "冰冻 " + CardColors.Amount(evt.Value) + " 张", UiKit.FreezeIce);
                     break;
 
                 case BattleEventKind.Charge:
-                    AppendDetail(C(UiKit.ChargeGold, "充" + evt.Value));
+                    AppendDetail(C(UiKit.ChargeGold, WhoTag(evt.Side) + "充" +
+                        CardColors.Amount(evt.Value)));
                     break;
 
                 case BattleEventKind.HandMod:
@@ -815,6 +819,12 @@ public class BattlePanel : BasePanel
     private static string C(Color color, string text)
     {
         return "[color=#" + color.ToHtml(false) + "]" + text + "[/color]";
+    }
+
+    /// <summary>记录里代表"谁中了"：站在玩家视角写 我 / 敌。</summary>
+    private static string WhoTag(BattleSide side)
+    {
+        return side == BattleSide.Player ? "我" : "敌";
     }
 
     private static string ShortTime(float seconds)
