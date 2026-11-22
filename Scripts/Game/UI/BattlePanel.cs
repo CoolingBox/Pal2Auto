@@ -185,7 +185,8 @@ public class BattlePanel : BasePanel
         _enemyPortrait.Position = new Vector2(418f, 2f);
         _enemyPortrait.Size = new Vector2(124f, 78f);
         _root.AddChild(_enemyPortrait);
-        _enemyPortrait.SetShape(0.32f, 0.062f);
+        _enemyPortrait.SetShape(0.26f, 0.082f);
+        _enemyPortrait.SetGem(new Color(0.860f, 0.420f, 0.320f), true);
         _enemyPortrait.SetAccent(new Color(0.780f, 0.560f, 0.360f));
 
         _enemyName = UiKit.MakeLabel("", 17, new Color(0.900f, 0.760f, 0.620f));
@@ -209,7 +210,8 @@ public class BattlePanel : BasePanel
         _playerPortrait.Position = new Vector2(418f, 424f);
         _playerPortrait.Size = new Vector2(124f, 86f);
         _root.AddChild(_playerPortrait);
-        _playerPortrait.SetShape(0.30f, 0.058f);
+        _playerPortrait.SetShape(0.25f, 0.078f);
+        _playerPortrait.SetGem(new Color(0.560f, 0.780f, 0.900f), true);
         _playerPortrait.SetAccent(new Color(0.840f, 0.690f, 0.380f));
 
         _playerName = UiKit.MakeLabel("", 17, UiKit.Paper);
