@@ -24,6 +24,7 @@ public static class UiKit
     public static readonly Color IceCyan = new Color(0.370f, 0.700f, 0.780f);     // 冰：冰象法术
     public static readonly Color ThunderLilac = new Color(0.550f, 0.610f, 0.880f);// 雷：雷象法术
     public static readonly Color ExposeViolet = new Color(0.610f, 0.420f, 0.770f);// 破绽
+    public static readonly Color HandTeal = new Color(0.280f, 0.560f, 0.610f);    // 器物：改上场数（石青，和冰青靠明度分开）
 
     public static Font GameFont { get; private set; }
 

@@ -13,6 +13,7 @@ public enum CardType
     Guard,    // 护具：护体
     Heal,     // 丹药：回复
     Poison,   // 蛊毒：中毒
+    Support,  // 器物：改上场数（布袋、符咒、金石之类）
 }
 
 public enum SpellElement
@@ -42,6 +43,15 @@ public class CardConfig : BaseConfig
     public int Heal;
     public int Poison;
     public bool IgnoreShield;
+
+    /// <summary>本方上场数 +N（可为负）。</summary>
+    public int HandSelf;
+
+    /// <summary>对方上场数 +N（可为负）。</summary>
+    public int HandFoe;
+
+    /// <summary>上场数改动的持续时间（秒）。0 = 本场一直生效；>0 = 到点自动收回。</summary>
+    public float HandTime;
 
     public string Icon = "";   // Resources/Image/Items/{Icon}.png
     public string Desc = "";

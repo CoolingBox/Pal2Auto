@@ -1,7 +1,8 @@
 // 文件：BattlePanel.cs
 // 描述：卡组战斗界面。版面按"上下对峙"排：
-//       上方敌手 → 中间两排牌阵（上小下大）→ 下方我方。
-//       交手记录是可选抽屉（默认关闭），明细带时间与真实数值，统计页给出双方出手/伤害/护体等。
+//       上方敌手 → 中间两排牌阵（敌上我下，同一套卡面、同样的尺寸规则）→ 下方我方。
+//       双方各有抽牌堆与弃牌堆；上场数可被卡牌改写，牌数变了牌阵整体按比例缩放。
+//       交手记录是可选抽屉（默认关闭），明细带时间与真实数值，统计页给出双方汇总。
 //       规则见 Docs/卡组战斗设计.md。
 
 using System;
@@ -41,58 +42,53 @@ public class BattlePanel : BasePanel
     private const float W = 960f;
     private const float H = 540f;
 
-    // —— 我方手牌（大卡）——
-    private const float CardW = 150f;
-    private const float CardH = 196f;
-    private const float CardGap = 18f;
-    private const float CardX0 = 69f;
-    private const float CardY = 214f;
+    // 卡面基准尺寸与牌阵约束
+    private const float CardBaseW = 132f;
+    private const float CardBaseH = 160f;
+    private const float CardGap = 12f;
+    private const float RowMaxW = 788f;      // 两侧还要留给抽/弃牌堆
 
-    // —— 敌方手牌（小卡）——
-    private const float MiniW = 80f;
-    private const float MiniH = 108f;
-    private const float MiniGap = 12f;
-    private const float MiniX0 = 256f;
-    private const float MiniY = 96f;
+    private const float EnemyBandCenter = 164f;
+    private const float PlayerBandCenter = 332f;
 
-    // —— 交手记录抽屉 ——
+    // 交手记录抽屉
     private const float LogX = 8f;
     private const float LogY = 44f;
     private const float LogW = 320f;
     private const float LogH = 456f;
-    private const int LogKeep = 200;      // 内存里最多留多少行
-    private const int LogShow = 60;       // 界面上最多铺多少行
+    private const int LogKeep = 200;
+    private const int LogShow = 60;
 
     private Control _root;
     private bool _built;
 
     private DeckBattle _battle;
     private BattleTicker _ticker;
-    private readonly CardView[] _cards = new CardView[DeckBattle.HandSize];
-    private readonly MiniCardView[] _enemyCards = new MiniCardView[DeckBattle.HandSize];
+    private readonly CardView[] _playerCards = new CardView[DeckBattle.HandMax];
+    private readonly CardView[] _enemyCards = new CardView[DeckBattle.HandMax];
+    private int _lastPlayerCount = -1;
+    private int _lastEnemyCount = -1;
+
     private float _accum;
     private float _endDelay = -1f;
     private float _statRefresh;
 
-    private TextureRect _playerPortrait;
-    private TextureRect _enemyPortrait;
+    private PortraitFrame _playerPortrait;
+    private PortraitFrame _enemyPortrait;
     private Label _playerName;
     private Label _enemyName;
-    private Label _enemyIntent;
     private Label _playerStatus;
     private Label _enemyStatus;
-    private Label _playerPiles;
-    private Label _enemyPiles;
+    private Label _playerMeta;
+    private Label _enemyIntent;
     private UiBar _playerBar;
     private UiBar _enemyBar;
 
-    // 四堆牌：双方各一副抽牌堆 + 弃牌堆，摆在各自信息栏外侧
     private PileView _enemyDraw;
     private PileView _enemyDiscard;
     private PileView _playerDraw;
     private PileView _playerDiscard;
 
-    // —— 记录 ——
     private readonly List<string> _logLines = new List<string>();
     private bool _showLog;
     private bool _showStats;
@@ -167,8 +163,7 @@ public class BattlePanel : BasePanel
 
         BuildEnemyBlock();
         BuildDivider();
-        BuildEnemyHand();
-        BuildPlayerHand();
+        BuildHands();
         BuildPlayerBlock();
         BuildPiles();
         BuildLogDrawer();
@@ -178,66 +173,56 @@ public class BattlePanel : BasePanel
         _ticker = new BattleTicker();
         _ticker.Tick = OnTick;
         _root.AddChild(_ticker);
-
-        ApplyLogVisibility();
     }
 
     // —————————————————————————— 对峙的两个角色 ——————————————————————————
 
     private void BuildEnemyBlock()
     {
-        _enemyPortrait = new TextureRect();
-        _enemyPortrait.ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize;
-        _enemyPortrait.StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered;
-        _enemyPortrait.MouseFilter = Control.MouseFilterEnum.Ignore;
+        _enemyPortrait = new PortraitFrame();
+        _enemyPortrait.Position = new Vector2(418f, 2f);
+        _enemyPortrait.Size = new Vector2(124f, 78f);
         _root.AddChild(_enemyPortrait);
-        _enemyPortrait.Position = new Vector2(418f, 6f);
-        _enemyPortrait.Size = new Vector2(124f, 86f);
+        _enemyPortrait.SetShape(0.32f, 0.062f);
+        _enemyPortrait.SetAccent(new Color(0.780f, 0.560f, 0.360f));
 
         _enemyName = UiKit.MakeLabel("", 17, new Color(0.900f, 0.760f, 0.620f));
-        UiKit.Place(_enemyName, 556f, 2f, 230f, 22f);
+        UiKit.Place(_enemyName, 556f, 4f, 230f, 20f);
         _root.AddChild(_enemyName);
 
-        _enemyBar = BuildBar(556f, 26f, 230f, 18f, new Color(0.560f, 0.220f, 0.200f));
+        _enemyBar = BuildBar(556f, 26f, 230f, 16f, new Color(0.560f, 0.220f, 0.200f));
 
         _enemyStatus = UiKit.MakeLabel("", 11, UiKit.PaperDim);
-        UiKit.Place(_enemyStatus, 556f, 46f, 230f, 15f);
+        UiKit.Place(_enemyStatus, 556f, 44f, 230f, 14f);
         _root.AddChild(_enemyStatus);
 
-        _enemyPiles = UiKit.MakeLabel("", 11, UiKit.Dim);
-        UiKit.Place(_enemyPiles, 556f, 61f, 230f, 14f);
-        _root.AddChild(_enemyPiles);
-
-        _enemyIntent = UiKit.MakeLabel("", 12, UiKit.Gold);
-        UiKit.Place(_enemyIntent, 556f, 75f, 230f, 16f);
+        _enemyIntent = UiKit.MakeLabel("", 11, UiKit.Gold);
+        UiKit.Place(_enemyIntent, 556f, 60f, 230f, 14f);
         _root.AddChild(_enemyIntent);
-
     }
 
     private void BuildPlayerBlock()
     {
-        _playerPortrait = new TextureRect();
-        _playerPortrait.ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize;
-        _playerPortrait.StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered;
-        _playerPortrait.MouseFilter = Control.MouseFilterEnum.Ignore;
+        _playerPortrait = new PortraitFrame();
+        _playerPortrait.Position = new Vector2(418f, 424f);
+        _playerPortrait.Size = new Vector2(124f, 86f);
         _root.AddChild(_playerPortrait);
-        _playerPortrait.Position = new Vector2(418f, 450f);
-        _playerPortrait.Size = new Vector2(124f, 84f);
+        _playerPortrait.SetShape(0.30f, 0.058f);
+        _playerPortrait.SetAccent(new Color(0.840f, 0.690f, 0.380f));
 
         _playerName = UiKit.MakeLabel("", 17, UiKit.Paper);
-        UiKit.Place(_playerName, 556f, 448f, 230f, 22f);
+        UiKit.Place(_playerName, 556f, 420f, 230f, 20f);
         _root.AddChild(_playerName);
 
-        _playerBar = BuildBar(556f, 472f, 230f, 18f, new Color(0.600f, 0.180f, 0.160f));
+        _playerBar = BuildBar(556f, 442f, 230f, 16f, new Color(0.600f, 0.180f, 0.160f));
 
         _playerStatus = UiKit.MakeLabel("", 11, UiKit.PaperDim);
-        UiKit.Place(_playerStatus, 556f, 492f, 230f, 15f);
+        UiKit.Place(_playerStatus, 556f, 460f, 230f, 14f);
         _root.AddChild(_playerStatus);
 
-        _playerPiles = UiKit.MakeLabel("", 11, UiKit.Dim);
-        UiKit.Place(_playerPiles, 556f, 507f, 230f, 14f);
-        _root.AddChild(_playerPiles);
-
+        _playerMeta = UiKit.MakeLabel("", 11, UiKit.Dim);
+        UiKit.Place(_playerMeta, 556f, 476f, 230f, 14f);
+        _root.AddChild(_playerMeta);
     }
 
     /// <summary>两排牌阵之间的细分割线：让"上面是敌、下面是我"不靠猜。</summary>
@@ -245,8 +230,8 @@ public class BattlePanel : BasePanel
     {
         ColorRect line = new ColorRect();
         line.Color = new Color(0.380f, 0.330f, 0.250f, 0.55f);
-        line.Position = new Vector2(120f, 206f);
-        line.Size = new Vector2(720f, 1f);
+        line.Position = new Vector2(110f, 248f);
+        line.Size = new Vector2(740f, 1f);
         line.MouseFilter = Control.MouseFilterEnum.Ignore;
         _root.AddChild(line);
     }
@@ -280,42 +265,77 @@ public class BattlePanel : BasePanel
         return bar;
     }
 
-    private void BuildEnemyHand()
+    private void BuildHands()
     {
-        for (int i = 0; i < _enemyCards.Length; i++)
+        for (int i = 0; i < DeckBattle.HandMax; i++)
         {
-            MiniCardView card = new MiniCardView();
-            card.SlotIndex = i;
-            card.Position = new Vector2(MiniX0 + i * (MiniW + MiniGap), MiniY);
-            card.Size = new Vector2(MiniW, MiniH);
-            _root.AddChild(card);
-            _enemyCards[i] = card;
+            CardView enemy = new CardView();
+            enemy.SlotIndex = i;
+            enemy.Position = new Vector2(126f, EnemyBandCenter - CardBaseH * 0.5f);
+            enemy.Size = new Vector2(CardBaseW, CardBaseH);
+            enemy.Visible = false;
+            _root.AddChild(enemy);
+            _enemyCards[i] = enemy;
+
+            CardView player = new CardView();
+            player.SlotIndex = i;
+            player.Position = new Vector2(126f, PlayerBandCenter - CardBaseH * 0.5f);
+            player.Size = new Vector2(CardBaseW, CardBaseH);
+            player.Visible = false;
+            _root.AddChild(player);
+            _playerCards[i] = player;
         }
     }
 
-    private void BuildPlayerHand()
+    /// <summary>牌数少时用基准尺寸，牌数多时按行宽反算；敌我共用这一套，张数相同则尺寸必然相同。</summary>
+    private static float CardWidthFor(int count)
     {
-        for (int i = 0; i < _cards.Length; i++)
+        if (count < 1)
         {
-            CardView card = new CardView();
-            card.SlotIndex = i;
-            card.Position = new Vector2(CardX0 + i * (CardW + CardGap), CardY);
-            card.Size = new Vector2(CardW, CardH);
-            _root.AddChild(card);
-            _cards[i] = card;
+            count = 1;
+        }
+
+        float byRow = (RowMaxW - CardGap * (count - 1)) / count;
+        return Mathf.Min(CardBaseW, byRow);
+    }
+
+    private static float CardHeightFor(int count)
+    {
+        return CardWidthFor(count) * (CardBaseH / CardBaseW);
+    }
+
+    private void LayoutHand(CardView[] views, int count, float bandCenter)
+    {
+        float w = CardWidthFor(count);
+        float h = CardHeightFor(count);
+        float total = count * w + (count - 1) * CardGap;
+        float x0 = (W - total) * 0.5f;
+        float y = bandCenter - h * 0.5f;
+
+        for (int i = 0; i < views.Length; i++)
+        {
+            if (i >= count)
+            {
+                views[i].Visible = false;
+                continue;
+            }
+
+            views[i].Visible = true;
+            views[i].Position = new Vector2(x0 + i * (w + CardGap), y);
+            views[i].FitTo(w, h);
         }
     }
 
     /// <summary>
-    /// 四堆牌：敌方两堆贴在其信息栏右侧，我方两堆贴在我方信息栏右侧。
+    /// 四堆牌：右侧上下各两堆（上敌下我）。
     /// 牌堆必须"看得见"——只写一行"抽 3 / 弃 5"，玩家没法判断还剩几张、弃了什么。
     /// </summary>
     private void BuildPiles()
     {
-        _enemyDraw = MakePile(798f, 8f);
-        _enemyDiscard = MakePile(874f, 8f);
-        _playerDraw = MakePile(798f, 450f);
-        _playerDiscard = MakePile(874f, 450f);
+        _enemyDraw = MakePile(882f, 88f);
+        _enemyDiscard = MakePile(882f, 168f);
+        _playerDraw = MakePile(882f, 256f);
+        _playerDiscard = MakePile(882f, 336f);
     }
 
     private PileView MakePile(float x, float y)
@@ -332,7 +352,7 @@ public class BattlePanel : BasePanel
     private void BuildLogToggle()
     {
         _logToggle = UiKit.MakeButton("交战记录 · 关", false);
-        _logToggle.Position = new Vector2(8f, 6f);
+        _logToggle.Position = new Vector2(8f, 4f);
         _logToggle.Size = new Vector2(132f, 30f);
         _logToggle.AddThemeFontSizeOverride("font_size", 13);
         _logToggle.Pressed += OnToggleLog;
@@ -571,6 +591,8 @@ public class BattlePanel : BasePanel
 
         _accum = 0f;
         _endDelay = -1f;
+        _lastPlayerCount = -1;
+        _lastEnemyCount = -1;
         _logLines.Clear();
         _pending.Active = false;
         _showStats = false;
@@ -588,13 +610,13 @@ public class BattlePanel : BasePanel
         RefreshTabState();
         RefreshLogView();
 
-        _playerPortrait.Texture = UiKit.LoadTexture("res://Resources/Image/Portrait/" + portraitKey + ".png");
-        _enemyPortrait.Texture = UiKit.LoadTexture("res://Resources/Image/Portrait/" + enemy.Portrait + ".png");
+        _playerPortrait.SetPortrait(portraitKey);
+        _enemyPortrait.SetPortrait(enemy.Portrait);
 
         _resultOverlay.Visible = false;
         SyncCards();
         RefreshStatus();
-        AddLogLine("开局：双方各抽 " + DeckBattle.HandSize + " 张，倒计时归零自动出手");
+        AddLogLine("开局：双方各抽 " + DeckBattle.HandBase + " 张，倒计时归零自动出手");
         RefreshLogView();
     }
 
@@ -671,16 +693,20 @@ public class BattlePanel : BasePanel
 
                     if (evt.Side == BattleSide.Player)
                     {
-                        if (evt.Slot >= 0 && evt.Slot < _cards.Length)
+                        if (evt.Slot >= 0 && evt.Slot < _playerCards.Length && _playerCards[evt.Slot].Visible)
                         {
-                            _cards[evt.Slot].PlayFlash();
+                            _playerCards[evt.Slot].PlayFlash();
                         }
                         AudioManager.PlaySFX("slash", true);
+                    }
+                    else if (evt.Slot >= 0 && evt.Slot < _enemyCards.Length && _enemyCards[evt.Slot].Visible)
+                    {
+                        _enemyCards[evt.Slot].PlayFlash();
                     }
                     break;
 
                 case BattleEventKind.Draw:
-                    // 补抽太密，明细里不记（牌堆数在两侧信息栏）；但要把上一手收尾
+                    // 补抽太密，明细里不记（牌堆在右侧）；但要把上一手收尾
                     FlushPending();
                     break;
 
@@ -733,6 +759,23 @@ public class BattlePanel : BasePanel
                     AppendDetail(C(UiKit.ExposeViolet, "破" + evt.Value));
                     ShowFloating(evt.Side == BattleSide.Enemy ? EnemyPoint() : PlayerPoint(),
                         "破绽 " + evt.Value, UiKit.ExposeViolet);
+                    break;
+
+                case BattleEventKind.HandMod:
+                    if (_pending.Active)
+                    {
+                        AppendDetail(C(UiKit.HandTeal, "上" + evt.Value));
+                    }
+                    else
+                    {
+                        // 到期收回不挂在某张牌上，自己起一行，否则记录里会看到数值莫名变回去
+                        string tail = evt.Revert ? " 限时到期 " : " ";
+                        AddLogLine(Stamp(_battle.Elapsed) + "  " + WhoOf(evt.Side) + tail +
+                                   C(new Color(0.470f, 0.430f, 0.360f), "→") + " " +
+                                   C(UiKit.HandTeal, "上场 " + evt.Value));
+                    }
+                    ShowFloating(evt.Side == BattleSide.Enemy ? EnemyPoint() : PlayerPoint(),
+                        "上场 " + evt.Value, UiKit.HandTeal);
                     break;
 
                 case BattleEventKind.End:
@@ -871,7 +914,7 @@ public class BattlePanel : BasePanel
         text += "毒伤 " + C(UiKit.PoisonGreen, st.PoisonDamage + "") +
                 "　破绽 " + C(UiKit.ExposeViolet, st.ExposeApplied + "") + "\n";
         text += "首手 " + C(UiKit.PaperDim, first) +
-                "　残血 " + C(UiKit.PaperDim, unit.Hp + " / " + unit.MaxHp) + "\n";
+                "　上场 " + C(UiKit.HandTeal, unit.ActiveSlots + "") + "\n";
         return text;
     }
 
@@ -884,28 +927,48 @@ public class BattlePanel : BasePanel
             return;
         }
 
-        for (int i = 0; i < _cards.Length; i++)
+        int playerCount = _battle.Player.ActiveSlots;
+        if (playerCount != _lastPlayerCount)
         {
-            HandSlot slot = _battle.Player.Hand[i];
-            if (slot.Occupied)
+            _lastPlayerCount = playerCount;
+            LayoutHand(_playerCards, playerCount, PlayerBandCenter);
+        }
+
+        int enemyCount = _battle.Enemy.ActiveSlots;
+        if (enemyCount != _lastEnemyCount)
+        {
+            _lastEnemyCount = enemyCount;
+            LayoutHand(_enemyCards, enemyCount, EnemyBandCenter);
+        }
+
+        for (int i = 0; i < DeckBattle.HandMax; i++)
+        {
+            if (i < playerCount)
             {
-                _cards[i].SetCard(slot.Card);
-                _cards[i].SetCountdown(slot.Progress, slot.Countdown);
-            }
-            else
-            {
-                _cards[i].SetEmpty();
+                HandSlot slot = _battle.Player.Hand[i];
+                if (slot.Occupied)
+                {
+                    _playerCards[i].SetCard(slot.Card);
+                    _playerCards[i].SetCountdown(slot.Progress, slot.Countdown);
+                }
+                else
+                {
+                    _playerCards[i].SetEmpty();
+                }
             }
 
-            HandSlot enemySlot = _battle.Enemy.Hand[i];
-            if (enemySlot.Occupied)
+            if (i < enemyCount)
             {
-                _enemyCards[i].SetCard(enemySlot.Card);
-                _enemyCards[i].SetCountdown(enemySlot.Progress, enemySlot.Countdown);
-            }
-            else
-            {
-                _enemyCards[i].SetEmpty();
+                HandSlot enemySlot = _battle.Enemy.Hand[i];
+                if (enemySlot.Occupied)
+                {
+                    _enemyCards[i].SetCard(enemySlot.Card);
+                    _enemyCards[i].SetCountdown(enemySlot.Progress, enemySlot.Countdown);
+                }
+                else
+                {
+                    _enemyCards[i].SetEmpty();
+                }
             }
         }
     }
@@ -924,24 +987,17 @@ public class BattlePanel : BasePanel
         _playerStatus.Text = BuildStatus(p);
         _enemyStatus.Text = BuildStatus(e);
 
-        _playerPiles.Text = "已出 " + p.Stats.Played + " 张";
-        _enemyPiles.Text = "已出 " + e.Stats.Played + " 张";
+        _playerMeta.Text = "已出 " + p.Stats.Played + " 张　上场 " + p.ActiveSlots;
+
+        CardConfig intent = _battle.EnemyFastestCard();
+        string next = intent != null ? intent.Name : "—";
+        _enemyIntent.Text = "上场 " + e.ActiveSlots + "　下一手：" + next;
 
         // 抽牌堆不露牌面（牌序由内核决定，露了就剧透）；弃牌堆露出最后进去那张
         _enemyDraw.SetPile("抽牌堆", e.DrawPile.Count, e.DrawPile, false, new Color(0.520f, 0.420f, 0.260f));
         _enemyDiscard.SetPile("弃牌堆", e.DiscardPile.Count, e.DiscardPile, true, new Color(0.360f, 0.320f, 0.260f));
         _playerDraw.SetPile("抽牌堆", p.DrawPile.Count, p.DrawPile, false, new Color(0.560f, 0.460f, 0.280f));
         _playerDiscard.SetPile("弃牌堆", p.DiscardPile.Count, p.DiscardPile, true, new Color(0.400f, 0.350f, 0.280f));
-
-        CardConfig intent = _battle.EnemyFastestCard();
-        if (intent != null)
-        {
-            _enemyIntent.Text = "下一手：" + intent.Name;
-        }
-        else
-        {
-            _enemyIntent.Text = "下一手：—";
-        }
     }
 
     private static string BuildStatus(FighterState unit)
@@ -973,12 +1029,12 @@ public class BattlePanel : BasePanel
 
     private Vector2 PlayerPoint()
     {
-        return new Vector2(480f, 490f);
+        return new Vector2(480f, 470f);
     }
 
     private Vector2 EnemyPoint()
     {
-        return new Vector2(480f, 46f);
+        return new Vector2(480f, 40f);
     }
 
     private void ShowFloating(Vector2 origin, string text, Color color)
@@ -1023,7 +1079,7 @@ public class BattlePanel : BasePanel
             // 记录默认关闭，结算时也别把人晾着：给一行提示去哪看明细
             if (!_showLog)
             {
-                _resultBody.Text += "\n（右上「交战记录」可看逐手明细）";
+                _resultBody.Text += "\n（左上「交战记录」可看逐手明细）";
             }
         }
 

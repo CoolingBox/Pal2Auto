@@ -1,9 +1,11 @@
 // 文件：CardView.cs
-// 描述：手牌控件 —— 图标 + 名字 + 彩色效果标签 + 蓄势倒计时。
+// 描述：手牌控件（敌我通用一套外观）—— 图标 + 名字 + 彩色效果标签 + 蓄势倒计时 + 进度条。
+//
+// 版面按比例算（Layout），所以上场数从 5 变到 8 时牌会整体缩小而不会散架；
+// 敌我用同一个类、同一套尺寸规则：数量相同时，两边卡牌大小完全一致。
 //
 // 颜色编码（卡面标签、边框、飘字共用一套）：
-//   攻 物理伤害 → 红　火 火焰 → 橙黄　守 护体 → 黄　疗 回复 → 翠绿　毒 中毒 → 深绿
-// 一张牌可以带多种效果（复合），标签逐个上色，边框取"主效果"色。
+//   场 上场数 → 石青　攻 物理 → 红　术 法术 → 元素色　守 护体 → 黄　疗 回复 → 翠绿　毒 中毒 → 深绿
 
 using Godot;
 
@@ -15,13 +17,19 @@ public partial class CardView : Control
     private TextureRect _icon;
     private Label _name;
     private RichTextLabel _effects;
-    private Label _countdown;
     private Label _cdCaption;
+    private Label _countdown;
     private ColorRect _barBg;
     private ColorRect _barFill;
     private ColorRect _flash;
     private bool _built;
     private bool _empty = true;
+
+    // 进度条的当前几何：SetCountdown 每帧都要用，存下来免得重复算
+    private float _barX;
+    private float _barY;
+    private float _barW;
+    private float _barH;
 
     public override void _Ready()
     {
@@ -39,8 +47,6 @@ public partial class CardView : Control
         MouseFilter = MouseFilterEnum.Stop;
 
         _frame = new Panel();
-        _frame.Position = Vector2.Zero;
-        _frame.Size = Size;
         _frame.MouseFilter = MouseFilterEnum.Ignore;
         AddChild(_frame);
 
@@ -49,17 +55,12 @@ public partial class CardView : Control
         _icon.StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered;
         _icon.MouseFilter = MouseFilterEnum.Ignore;
         AddChild(_icon);
-        _icon.Position = new Vector2(14f, 2f);
-        _icon.Size = new Vector2(Size.X - 28f, 64f);
 
-        _name = UiKit.MakeLabel("", 16, UiKit.Paper);
-        UiKit.Place(_name, 6f, 64f, Size.X - 12f, 20f, HorizontalAlignment.Center);
+        _name = UiKit.MakeLabel("", 15, UiKit.Paper);
         AddChild(_name);
 
         _effects = new RichTextLabel();
         _effects.BbcodeEnabled = true;
-        _effects.Position = new Vector2(6f, 84f);
-        _effects.Size = new Vector2(Size.X - 12f, 38f);
         _effects.FitContent = false;
         _effects.ScrollActive = false;
         _effects.AutowrapMode = TextServer.AutowrapMode.Arbitrary;
@@ -69,37 +70,84 @@ public partial class CardView : Control
         _effects.AddThemeConstantOverride("line_separation", 0);
         AddChild(_effects);
 
-        // 倒计时上面挂一行小字：光一个 "1.1" 不说明它是多久
-        _cdCaption = UiKit.MakeLabel("蓄 势", 11, new Color(0.560f, 0.510f, 0.420f));
-        UiKit.Place(_cdCaption, 6f, 122f, Size.X - 12f, 14f, HorizontalAlignment.Center);
+        _cdCaption = UiKit.MakeLabel("蓄 势", 10, new Color(0.560f, 0.510f, 0.420f));
         AddChild(_cdCaption);
 
-        _countdown = UiKit.MakeLabel("", 30, UiKit.Gold);
-        UiKit.Place(_countdown, 6f, 136f, Size.X - 12f, 40f, HorizontalAlignment.Center);
+        _countdown = UiKit.MakeLabel("", 26, UiKit.Gold);
         AddChild(_countdown);
 
         _barBg = new ColorRect();
         _barBg.Color = new Color(0.060f, 0.055f, 0.048f);
-        _barBg.Position = new Vector2(14f, Size.Y - 16f);
-        _barBg.Size = new Vector2(Size.X - 28f, 8f);
         _barBg.MouseFilter = MouseFilterEnum.Ignore;
         AddChild(_barBg);
 
         _barFill = new ColorRect();
         _barFill.Color = new Color(0.620f, 0.470f, 0.240f);
-        _barFill.Position = new Vector2(14f, Size.Y - 16f);
-        _barFill.Size = new Vector2(0f, 8f);
         _barFill.MouseFilter = MouseFilterEnum.Ignore;
         AddChild(_barFill);
 
         _flash = new ColorRect();
         _flash.Color = new Color(1f, 0.92f, 0.70f, 0.30f);
-        _flash.Size = Size;
         _flash.MouseFilter = MouseFilterEnum.Ignore;
         _flash.Visible = false;
         AddChild(_flash);
 
+        Layout();
         SetEmpty();
+    }
+
+    /// <summary>改尺寸并重排。上场数变化时由面板调用。</summary>
+    public void FitTo(float width, float height)
+    {
+        Build();
+        Size = new Vector2(width, height);
+        Layout();
+    }
+
+    /// <summary>全部子件按 0~1 的比例摆，字号跟着宽度缩。</summary>
+    private void Layout()
+    {
+        float w = Size.X;
+        float h = Size.Y;
+        if (w <= 1f || h <= 1f)
+        {
+            return;
+        }
+
+        // 字号缩放：132 宽为基准；缩到 0.62 以下就不再缩，否则汉字糊成墨点
+        float f = Mathf.Clamp(w / 132f, 0.62f, 1f);
+
+        _frame.Position = Vector2.Zero;
+        _frame.Size = Size;
+
+        _icon.Position = new Vector2(w * 0.09f, h * 0.012f);
+        _icon.Size = new Vector2(w * 0.82f, h * 0.288f);
+
+        _name.AddThemeFontSizeOverride("font_size", Mathf.RoundToInt(15f * f) + 1);
+        UiKit.Place(_name, w * 0.03f, h * 0.30f, w * 0.94f, h * 0.115f, HorizontalAlignment.Center);
+
+        _effects.Position = new Vector2(w * 0.03f, h * 0.415f);
+        _effects.Size = new Vector2(w * 0.94f, h * 0.205f);
+        _effects.AddThemeFontSizeOverride("normal_font_size", Mathf.RoundToInt(18f * f) + 1);
+
+        _cdCaption.AddThemeFontSizeOverride("font_size", Mathf.Max(9, Mathf.RoundToInt(10f * f)));
+        UiKit.Place(_cdCaption, w * 0.03f, h * 0.622f, w * 0.94f, h * 0.072f, HorizontalAlignment.Center);
+
+        _countdown.AddThemeFontSizeOverride("font_size", Mathf.Max(16, Mathf.RoundToInt(26f * f)));
+        UiKit.Place(_countdown, w * 0.03f, h * 0.694f, w * 0.94f, h * 0.235f, HorizontalAlignment.Center);
+
+        _barH = Mathf.Max(4f, h * 0.045f);
+        _barY = h - _barH - h * 0.014f;
+        _barX = w * 0.09f;
+        _barW = w * 0.82f;
+
+        _barBg.Position = new Vector2(_barX, _barY);
+        _barBg.Size = new Vector2(_barW, _barH);
+        _barFill.Position = new Vector2(_barX, _barY);
+        _barFill.Size = new Vector2(0f, _barH);
+
+        _flash.Position = Vector2.Zero;
+        _flash.Size = Size;
     }
 
     public void SetCard(CardConfig card)
@@ -132,9 +180,9 @@ public partial class CardView : Control
         _icon.Visible = false;
         _name.Text = "";
         _effects.Text = "";
-        _countdown.Text = "";
         _cdCaption.Visible = false;
-        _barFill.Size = new Vector2(0f, 8f);
+        _countdown.Text = "";
+        _barFill.Size = new Vector2(0f, _barH);
         _barFill.Color = new Color(0.620f, 0.470f, 0.240f);
         TooltipText = "";
 
@@ -150,8 +198,7 @@ public partial class CardView : Control
         }
 
         _countdown.Text = remain.ToString("0.0");
-        float width = Size.X - 28f;
-        _barFill.Size = new Vector2(Mathf.Round(width * Mathf.Clamp(progress, 0f, 1f)), 8f);
+        _barFill.Size = new Vector2(Mathf.Round(_barW * Mathf.Clamp(progress, 0f, 1f)), _barH);
 
         // 快出手时数字转亮，制造"要打了"的预期
         if (remain <= 0.6f)

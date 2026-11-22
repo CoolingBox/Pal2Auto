@@ -24,6 +24,7 @@ public enum BattleEventKind
     Heal,       // 回复（Side = 回复方）
     Poison,     // 中毒结算/叠加（Side = 受影响方）
     Expose,     // 破绽叠层（Side = 受影响方）
+    HandMod,    // 上场数变化（Side = 受影响方，Value = 变化后的值）
     End,
 }
 
@@ -44,6 +45,9 @@ public struct BattleEvent
 
     /// <summary>被护体吸收掉的量。负伤日志里的"挡 N"。</summary>
     public int Absorbed;
+
+    /// <summary>上场数事件是不是"限时到期收回"（日志措辞不同）。</summary>
+    public bool Revert;
 }
 
 /// <summary>一方的战斗统计。界面"统计"页与结算面板都读这里，不各自再算一份。</summary>
@@ -113,6 +117,26 @@ public sealed class FighterState
     public FightStats Stats = new FightStats();
 
     public HandSlot[] Hand;
+
+    /// <summary>当前上场数（手牌槽位数）。基础 5，可被卡牌临时或本场改写。</summary>
+    public int HandCapacity = DeckBattle.HandBase;
+
+    /// <summary>实际参与推进的槽位数。</summary>
+    public int ActiveSlots
+    {
+        get
+        {
+            if (HandCapacity < 1)
+            {
+                return 1;
+            }
+            if (HandCapacity > DeckBattle.HandMax)
+            {
+                return DeckBattle.HandMax;
+            }
+            return HandCapacity;
+        }
+    }
     public List<CardConfig> DrawPile = new List<CardConfig>();
     public List<CardConfig> DiscardPile = new List<CardConfig>();
 
@@ -136,7 +160,11 @@ public sealed class FighterState
 
 public sealed class DeckBattle
 {
-    public const int HandSize = 5;
+    /// <summary>基础上场数。卡牌可以临时或本场改写它（见 CardConfig.HandSelf / HandFoe）。</summary>
+    public const int HandBase = 5;
+
+    /// <summary>上场数上限。界面按这个数建槽位，改这里要同步改 BattlePanel 的布局。</summary>
+    public const int HandMax = 8;
     public const float PoisonPerStackPerSecond = 1f;
     public const float TimeLimit = 60f;
 
@@ -158,6 +186,16 @@ public sealed class DeckBattle
 
     private readonly Random _rng = new Random();
 
+    /// <summary>限时上场数修正。Remain 归零时把当时加上去的量原样收回。</summary>
+    private sealed class HandModifier
+    {
+        public FighterState Target;
+        public int Applied;
+        public float Remain;
+    }
+
+    private readonly List<HandModifier> _handMods = new List<HandModifier>();
+
     public static DeckBattle Create(string playerName, string playerPortrait, int playerHp,
         List<int> playerDeck, string enemyName, string enemyPortrait, int enemyHp, int[] enemyDeck)
     {
@@ -175,9 +213,9 @@ public sealed class DeckBattle
         fighter.Portrait = portrait;
         fighter.MaxHp = maxHp;
         fighter.Hp = maxHp;
-        fighter.Hand = new HandSlot[HandSize];
+        fighter.Hand = new HandSlot[HandMax];
 
-        for (int i = 0; i < HandSize; i++)
+        for (int i = 0; i < HandMax; i++)
         {
             fighter.Hand[i] = new HandSlot();
         }
@@ -210,9 +248,15 @@ public sealed class DeckBattle
     private void DrawOpeningHand()
     {
         List<BattleEvent> ignored = new List<BattleEvent>();
-        for (int slot = 0; slot < HandSize; slot++)
+        int playerSlots = Player.ActiveSlots;
+        for (int slot = 0; slot < playerSlots; slot++)
         {
             DrawInto(Player, slot, ignored);
+        }
+
+        int enemySlots = Enemy.ActiveSlots;
+        for (int slot = 0; slot < enemySlots; slot++)
+        {
             DrawInto(Enemy, slot, ignored);
         }
     }
@@ -227,6 +271,7 @@ public sealed class DeckBattle
 
         Elapsed += dt;
 
+        TickHandMods(dt, events);
         TickFighter(Player, Enemy, dt, events);
         TickFighter(Enemy, Player, dt, events);
 
@@ -244,6 +289,77 @@ public sealed class DeckBattle
         TickExpose(owner, dt);
         TickPoison(owner, dt, events);
         TickHand(owner, foe, dt, events);
+    }
+
+    private void TickHandMods(float dt, List<BattleEvent> events)
+    {
+        for (int i = _handMods.Count - 1; i >= 0; i--)
+        {
+            HandModifier mod = _handMods[i];
+            mod.Remain -= dt;
+            if (mod.Remain > 0f)
+            {
+                continue;
+            }
+
+            // 到期收回：只收回当初真正加上去的量（可能被上限截断过）
+            ApplyCapacity(mod.Target, -mod.Applied, events, true);
+            _handMods.RemoveAt(i);
+        }
+    }
+
+    /// <summary>
+    /// 改上场数。加：新槽位立刻补抽；减：被砍掉的槽位里的牌进弃牌堆（不是凭空消失）。
+    /// 返回真正生效的变化量——顶到上下限时可能是 0。
+    /// </summary>
+    private int ApplyCapacity(FighterState target, int delta, List<BattleEvent> events, bool revert)
+    {
+        int before = target.HandCapacity;
+        int after = Mathf.Clamp(before + delta, 1, HandMax);
+        int applied = after - before;
+        if (applied == 0)
+        {
+            return 0;
+        }
+
+        target.HandCapacity = after;
+
+        // 先报事件、后补抽：补抽会发 Draw，界面收到 Draw 就把当前这一手收尾了，
+        // 事件发晚了就会丢掉"上场 +1"这条明细。
+        BattleEvent evt = new BattleEvent();
+        evt.Kind = BattleEventKind.HandMod;
+        evt.Side = SideOf(target);
+        evt.Slot = -1;
+        evt.Value = after;
+        evt.Revert = revert;
+        evt.Text = "上场 " + after;
+        events.Add(evt);
+
+        if (applied > 0)
+        {
+            for (int slot = before; slot < after; slot++)
+            {
+                DrawInto(target, slot, events);
+            }
+        }
+        else
+        {
+            for (int slot = after; slot < before; slot++)
+            {
+                HandSlot handSlot = target.Hand[slot];
+                if (!handSlot.Occupied)
+                {
+                    continue;
+                }
+
+                target.DiscardPile.Add(handSlot.Card);
+                handSlot.Card = null;
+                handSlot.Countdown = 0f;
+                handSlot.CountdownMax = 0f;
+            }
+        }
+
+        return applied;
     }
 
     private void TickExpose(FighterState owner, float dt)
@@ -294,7 +410,8 @@ public sealed class DeckBattle
 
     private void TickHand(FighterState owner, FighterState foe, float dt, List<BattleEvent> events)
     {
-        for (int slot = 0; slot < HandSize; slot++)
+        int activeSlots = owner.ActiveSlots;
+        for (int slot = 0; slot < activeSlots; slot++)
         {
             HandSlot handSlot = owner.Hand[slot];
             if (!handSlot.Occupied)
@@ -394,6 +511,32 @@ public sealed class DeckBattle
             expose.Text = "破绽 " + foe.ExposeStacks;
             owner.Stats.ExposeApplied += card.Expose;
             events.Add(expose);
+        }
+
+        if (card.HandSelf != 0)
+        {
+            int applied = ApplyCapacity(owner, card.HandSelf, events, false);
+            if (card.HandTime > 0f && applied != 0)
+            {
+                HandModifier mod = new HandModifier();
+                mod.Target = owner;
+                mod.Applied = applied;
+                mod.Remain = card.HandTime;
+                _handMods.Add(mod);
+            }
+        }
+
+        if (card.HandFoe != 0)
+        {
+            int applied = ApplyCapacity(foe, card.HandFoe, events, false);
+            if (card.HandTime > 0f && applied != 0)
+            {
+                HandModifier mod = new HandModifier();
+                mod.Target = foe;
+                mod.Applied = applied;
+                mod.Remain = card.HandTime;
+                _handMods.Add(mod);
+            }
         }
 
         if (card.Poison > 0)

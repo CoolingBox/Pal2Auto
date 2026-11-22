@@ -26,6 +26,10 @@ public static class CardColors
         {
             return UiKit.PoisonGreen;
         }
+        if (card.Type == CardType.Support)
+        {
+            return UiKit.HandTeal;
+        }
 
         return UiKit.DamageRed;
     }
@@ -67,9 +71,14 @@ public static class CardColors
     /// <summary>这张牌带的效果色，按"攻 → 术 → 守 → 疗 → 毒 → 破"排序。</summary>
     public static Color[] EffectColors(CardConfig card)
     {
-        Color[] buffer = new Color[5];
+        Color[] buffer = new Color[6];
         int count = 0;
 
+        if (card.HandSelf != 0 || card.HandFoe != 0)
+        {
+            buffer[count] = UiKit.HandTeal;
+            count++;
+        }
         if (card.Damage > 0)
         {
             buffer[count] = UiKit.DamageRed;
@@ -114,6 +123,10 @@ public static class CardColors
     {
         string text = "";
 
+        if (card.HandSelf != 0 || card.HandFoe != 0)
+        {
+            text += Tag(UiKit.HandTeal, HandBody(card));
+        }
         if (card.Damage > 0)
         {
             text += Tag(UiKit.DamageRed, "攻 " + card.Damage);
@@ -142,6 +155,44 @@ public static class CardColors
         return text.TrimEnd();
     }
 
+    /// <summary>上场数标签的正文：我+1 / 敌-1 / 双+1，限时的再加 ·6s。</summary>
+    public static string HandBody(CardConfig card)
+    {
+        string body;
+        if (card.HandSelf != 0 && card.HandFoe != 0 && card.HandSelf == card.HandFoe)
+        {
+            body = "双" + Sign(card.HandSelf);
+        }
+        else if (card.HandSelf != 0 && card.HandFoe == 0)
+        {
+            body = "我" + Sign(card.HandSelf);
+        }
+        else if (card.HandFoe != 0 && card.HandSelf == 0)
+        {
+            body = "敌" + Sign(card.HandFoe);
+        }
+        else
+        {
+            body = "我" + Sign(card.HandSelf) + " 敌" + Sign(card.HandFoe);
+        }
+
+        if (card.HandTime > 0f)
+        {
+            body += "·" + card.HandTime.ToString("0") + "s";
+        }
+
+        return body;
+    }
+
+    private static string Sign(int value)
+    {
+        if (value > 0)
+        {
+            return "+" + value;
+        }
+        return value.ToString();
+    }
+
     private static string Tag(Color color, string content)
     {
         return "[color=#" + color.ToHtml(false) + "]" + content + "[/color]  ";
@@ -161,6 +212,10 @@ public static class CardColors
     public static string EffectSummary(CardConfig card)
     {
         string summary = "";
+        if (card.HandSelf != 0 || card.HandFoe != 0)
+        {
+            summary += "上场 " + HandBody(card) + "　";
+        }
         if (card.Damage > 0)
         {
             summary += "攻 " + card.Damage + "　";

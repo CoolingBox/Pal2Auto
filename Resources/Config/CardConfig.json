@@ -285,5 +285,67 @@
     "Shield": 8,
     "Icon": "item_poison2",
     "Desc": "2 层中毒并加 8 点护体，蛊神庇佑。"
+  },
+  {
+    "Id": 31,
+    "Name": "袖里乾坤",
+    "Type": "Support",
+    "Countdown": 2.8,
+    "HandSelf": 1,
+    "HandTime": 0,
+    "Icon": "item_amulet",
+    "Desc": "锦囊一展，多摆一件家什。我方上场 +1，本场一直有效。"
+  },
+  {
+    "Id": 32,
+    "Name": "分身符",
+    "Type": "Support",
+    "Countdown": 3.4,
+    "HandSelf": 1,
+    "HandFoe": 1,
+    "HandTime": 0,
+    "Icon": "item_talisman3",
+    "Desc": "符化分身，两边都多占一手。双方上场 +1，本场持续。"
+  },
+  {
+    "Id": 33,
+    "Name": "缚手咒",
+    "Type": "Support",
+    "Countdown": 2.6,
+    "HandFoe": -1,
+    "HandTime": 0,
+    "Icon": "item_talisman_guard",
+    "Desc": "束住对面手脚。敌方上场 -1，本场持续。"
+  },
+  {
+    "Id": 34,
+    "Name": "急就章",
+    "Type": "Support",
+    "Countdown": 3.0,
+    "HandSelf": 2,
+    "HandTime": 6,
+    "Icon": "item_brush",
+    "Desc": "临时赶工，六秒内我方上场 +2，过时收回。"
+  },
+  {
+    "Id": 35,
+    "Name": "乱神散",
+    "Type": "Support",
+    "Countdown": 2.4,
+    "HandFoe": -1,
+    "HandTime": 8,
+    "Icon": "item_poison2",
+    "Desc": "撒一把迷神药粉，八秒内敌方上场 -1。"
+  },
+  {
+    "Id": 36,
+    "Name": "聚宝盆",
+    "Type": "Support",
+    "Countdown": 3.2,
+    "HandSelf": 1,
+    "HandFoe": 1,
+    "HandTime": 12,
+    "Icon": "item_amulet2",
+    "Desc": "盆里生财，十二秒内双方上场各 +1。"
   }
 ]

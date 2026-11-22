@@ -3,7 +3,9 @@
 //       用途：改完界面立刻自证"画面非空白、没有报错"，不靠猜。
 
 using System;
+using System.Collections.Generic;
 using Godot;
+using TinyFramework;
 
 public static class DevShot
 {
@@ -45,6 +47,10 @@ public static class DevShot
             if (all[i] == "--clicklog")
             {
                 RunLogClickTest(host);
+            }
+            if (all[i].StartsWith("--sim="))
+            {
+                RunSim(all[i].Substring(6), host);
             }
         }
 
@@ -124,6 +130,66 @@ public static class DevShot
 
         await ClickAt(host, new Vector2(164f, 103f) * scale);
         GD.Print("CLICKLOG 已点击：交战记录开关 / 统计页");
+    }
+
+    /// <summary>
+    /// 无头批量对局：--sim=20 打 20 场，只打印胜负与用时。
+    /// 用来在没人陪玩时量一下改动对胜率的影响，别靠感觉调数值。
+    /// </summary>
+    private static void RunSim(string raw, Node host)
+    {
+        int rounds;
+        if (!int.TryParse(raw, out rounds) || rounds <= 0)
+        {
+            rounds = 10;
+        }
+
+        int charId = ReadCharId();
+        CharacterConfig character = ConfigManager.GetOne<CharacterConfig>(charId);
+        EnemyConfig enemy = ConfigManager.GetOne<EnemyConfig>(1);
+        if (character == null || enemy == null)
+        {
+            GD.Print("SIM 配置缺失");
+            host.GetTree().Quit(1);
+            return;
+        }
+
+        int wins = 0;
+        float totalTime = 0f;
+        int maxHand = DeckBattle.HandBase;
+        int minHand = DeckBattle.HandBase;
+
+        for (int round = 0; round < rounds; round++)
+        {
+            DeckBattle battle = DeckBattle.Create(character.Name, character.Portrait, 120,
+                new List<int>(character.Deck), enemy.Name, enemy.Portrait, enemy.Hp, enemy.Deck);
+
+            while (!battle.Finished)
+            {
+                battle.Step(0.05f);
+            }
+
+            if (battle.PlayerWon)
+            {
+                wins++;
+            }
+            totalTime += battle.Elapsed;
+
+            int peak = Mathf.Max(battle.Player.HandCapacity, battle.Enemy.HandCapacity);
+            if (peak > maxHand)
+            {
+                maxHand = peak;
+            }
+            if (peak < minHand)
+            {
+                minHand = peak;
+            }
+        }
+
+        GD.Print("SIM " + character.Name + " vs " + enemy.Name + "：" + rounds + " 场 " + wins + " 胜（" +
+                 Mathf.RoundToInt(100f * wins / rounds) + "%），均时 " +
+                 (totalTime / rounds).ToString("0.0") + " 秒，上场数区间 " + minHand + "~" + maxHand);
+        host.GetTree().Quit(0);
     }
 
     private static async void OpenBattleLater(Node host)
