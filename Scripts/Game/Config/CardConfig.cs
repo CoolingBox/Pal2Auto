@@ -30,6 +30,21 @@ public enum CardKeyword
 
     /// <summary>贯穿：无视护体，直接扣气血。</summary>
     Pierce = 4,
+
+    /// <summary>加速：我方随机 X 张牌，蓄势速度翻倍，持续 Y 秒。</summary>
+    Haste = 8,
+
+    /// <summary>减速：我方随机 X 张牌，蓄势速度减半，持续 Y 秒。与加速可抵消。</summary>
+    Slow = 16,
+
+    /// <summary>冰冻：我方随机 X 张牌，Y 秒内不能自然蓄势（可被充能），化冻后才能打出。</summary>
+    Freeze = 32,
+
+    /// <summary>充能：我方随机 X 张牌，蓄势立刻前进 1 秒。</summary>
+    Charge = 64,
+
+    /// <summary>多重：这张牌每次使用结算 X 次（补抽冷却也按次数拉长）。</summary>
+    Multi = 128,
 }
 
 public enum SpellElement
@@ -68,6 +83,28 @@ public class CardConfig : BaseConfig
 
     /// <summary>上场数改动的持续时间（秒）。0 = 本场一直生效；>0 = 到点自动收回。</summary>
     public float HandTime;
+
+    // —— 时机类（影响蓄势速度）——
+    /// <summary>加速：影响几张牌。</summary>
+    public int HasteCount;
+    /// <summary>加速：双倍蓄势持续几秒。</summary>
+    public float HasteTime;
+
+    /// <summary>减速：影响几张牌。</summary>
+    public int SlowCount;
+    /// <summary>减速：半速蓄势持续几秒。</summary>
+    public float SlowTime;
+
+    /// <summary>冰冻：影响几张牌。</summary>
+    public int FreezeCount;
+    /// <summary>冰冻：几秒内不能自然蓄势。</summary>
+    public float FreezeTime;
+
+    /// <summary>充能：影响几张牌（每张蓄势前进 1 秒）。</summary>
+    public int ChargeCount;
+
+    /// <summary>多重：这张牌每次使用结算几次。</summary>
+    public int MultiCount;
 
     /// <summary>关键字（可多个）。JSON 里写 "Exhaust" 或 "Exhaust, Remove"。</summary>
     public CardKeyword Keywords = CardKeyword.None;

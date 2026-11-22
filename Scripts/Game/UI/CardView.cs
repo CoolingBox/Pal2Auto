@@ -22,8 +22,14 @@ public partial class CardView : Control
     private Label _countdown;
     private ColorRect _barBg;
     private ColorRect _barFill;
+    private ColorRect _frost;
     private ColorRect _flash;
     private bool _built;
+
+    // 时机状态：决定倒计时数字的颜色与冻霜覆盖
+    private bool _frozen;
+    private bool _hasted;
+    private bool _slowed;
     private bool _empty = true;
 
     // 进度条的当前几何：SetCountdown 每帧都要用，存下来免得重复算
@@ -98,6 +104,13 @@ public partial class CardView : Control
         _barFill.MouseFilter = MouseFilterEnum.Ignore;
         AddChild(_barFill);
 
+        // 冻霜：冰冻期间盖一层薄冰蓝，光看数字颜色不够直观
+        _frost = new ColorRect();
+        _frost.Color = new Color(0.560f, 0.780f, 0.950f, 0.20f);
+        _frost.MouseFilter = MouseFilterEnum.Ignore;
+        _frost.Visible = false;
+        AddChild(_frost);
+
         _flash = new ColorRect();
         _flash.Color = new Color(1f, 0.92f, 0.70f, 0.30f);
         _flash.MouseFilter = MouseFilterEnum.Ignore;
@@ -162,6 +175,9 @@ public partial class CardView : Control
         _barFill.Position = new Vector2(_barX, _barY);
         _barFill.Size = new Vector2(0f, _barH);
 
+        _frost.Position = Vector2.Zero;
+        _frost.Size = Size;
+
         _flash.Position = Vector2.Zero;
         _flash.Size = Size;
     }
@@ -198,6 +214,10 @@ public partial class CardView : Control
         _name.Text = "";
         _effects.Text = "";
         _cdCaption.Visible = false;
+        _frozen = false;
+        _hasted = false;
+        _slowed = false;
+        _frost.Visible = false;
         _keywords.Text = "";
         _keywords.Visible = false;
         _countdown.Text = "";
@@ -235,6 +255,20 @@ public partial class CardView : Control
         return "[bgcolor=" + background + "][color=" + foreground + "] " + word + " [/color][/bgcolor] ";
     }
 
+    /// <summary>时机状态：冰冻 / 加速 / 减速。数字颜色和冻霜跟着变，不看文字也知道它现在的状态。</summary>
+    public void SetTiming(float haste, float slow, float freeze)
+    {
+        if (!_built)
+        {
+            return;
+        }
+
+        _hasted = haste > 0f;
+        _slowed = slow > 0f;
+        _frozen = freeze > 0f;
+        _frost.Visible = _frozen && !_empty;
+    }
+
     public void SetCountdown(float progress, float remain)
     {
         if (_empty)
@@ -245,15 +279,26 @@ public partial class CardView : Control
         _countdown.Text = remain.ToString("0.0");
         _barFill.Size = new Vector2(Mathf.Round(_barW * Mathf.Clamp(progress, 0f, 1f)), _barH);
 
-        // 快出手时数字转亮，制造"要打了"的预期
-        if (remain <= 0.6f)
+        Color color = UiKit.Gold;
+        if (_frozen)
         {
-            _countdown.AddThemeColorOverride("font_color", new Color(1f, 0.94f, 0.78f));
+            color = UiKit.FreezeIce;
         }
-        else
+        else if (remain <= 0.6f)
         {
-            _countdown.AddThemeColorOverride("font_color", UiKit.Gold);
+            // 快出手时数字转亮，制造"要打了"的预期
+            color = new Color(1f, 0.94f, 0.78f);
         }
+        else if (_hasted)
+        {
+            color = UiKit.HasteGreen;
+        }
+        else if (_slowed)
+        {
+            color = UiKit.SlowBlue;
+        }
+
+        _countdown.AddThemeColorOverride("font_color", color);
     }
 
     public void PlayFlash()

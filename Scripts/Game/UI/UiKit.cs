@@ -26,6 +26,13 @@ public static class UiKit
     public static readonly Color ExposeViolet = new Color(0.610f, 0.420f, 0.770f);// 破绽
     public static readonly Color HandTeal = new Color(0.280f, 0.560f, 0.610f);    // 器物：改上场数（石青，和冰青靠明度分开）
 
+    // —— 时机配色：五个关键字各一色，卡面标签 / 倒计时着色 / 记录共用 ——
+    public static readonly Color HasteGreen = new Color(0.740f, 0.880f, 0.420f);   // 加速：黄绿（"风"）
+    public static readonly Color ChargeGold = new Color(0.980f, 0.850f, 0.450f);   // 充能：明黄（"电"）
+    public static readonly Color SlowBlue = new Color(0.460f, 0.520f, 0.640f);     // 减速：灰蓝
+    public static readonly Color FreezeIce = new Color(0.680f, 0.860f, 0.980f);    // 冰冻：冰蓝
+    public static readonly Color MultiMagenta = new Color(0.860f, 0.580f, 0.780f); // 多重：品红
+
     public static Font GameFont { get; private set; }
 
     public static void Init()

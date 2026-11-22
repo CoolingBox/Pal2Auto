@@ -765,6 +765,24 @@ public class BattlePanel : BasePanel
                         "破绽 " + evt.Value, UiKit.ExposeViolet);
                     break;
 
+                case BattleEventKind.Haste:
+                    AppendDetail(C(UiKit.HasteGreen, "速" + evt.Value + "·" + ShortTime(evt.Duration) + "s"));
+                    break;
+
+                case BattleEventKind.Slow:
+                    AppendDetail(C(UiKit.SlowBlue, "缓" + evt.Value + "·" + ShortTime(evt.Duration) + "s"));
+                    break;
+
+                case BattleEventKind.Freeze:
+                    AppendDetail(C(UiKit.FreezeIce, "冻" + evt.Value + "·" + ShortTime(evt.Duration) + "s"));
+                    ShowFloating(evt.Side == BattleSide.Enemy ? EnemyPoint() : PlayerPoint(),
+                        "冰冻 " + evt.Value + " 张", UiKit.FreezeIce);
+                    break;
+
+                case BattleEventKind.Charge:
+                    AppendDetail(C(UiKit.ChargeGold, "充" + evt.Value));
+                    break;
+
                 case BattleEventKind.HandMod:
                     if (_pending.Active)
                     {
@@ -799,6 +817,11 @@ public class BattlePanel : BasePanel
         return "[color=#" + color.ToHtml(false) + "]" + text + "[/color]";
     }
 
+    private static string ShortTime(float seconds)
+    {
+        return seconds.ToString("0.#");
+    }
+
     private static string Stamp(float seconds)
     {
         return C(new Color(0.480f, 0.440f, 0.370f), seconds.ToString("0.0") + "s");
@@ -815,6 +838,10 @@ public class BattlePanel : BasePanel
         _pending.Time = _battle.Elapsed;
         _pending.Who = WhoOf(evt.Side);
         _pending.Card = "「" + evt.Text + "」";
+        if (evt.Value > 1)
+        {
+            _pending.Card += C(UiKit.MultiMagenta, "×" + evt.Value);
+        }
         if (evt.Card != null)
         {
             if (evt.Card.HasKeyword(CardKeyword.Exhaust))
@@ -966,6 +993,7 @@ public class BattlePanel : BasePanel
                 {
                     _playerCards[i].SetCard(slot.Card);
                     _playerCards[i].SetCountdown(slot.Progress, slot.Countdown);
+                    _playerCards[i].SetTiming(slot.HasteTime, slot.SlowTime, slot.FreezeTime);
                 }
                 else
                 {
@@ -980,6 +1008,7 @@ public class BattlePanel : BasePanel
                 {
                     _enemyCards[i].SetCard(enemySlot.Card);
                     _enemyCards[i].SetCountdown(enemySlot.Progress, enemySlot.Countdown);
+                    _enemyCards[i].SetTiming(enemySlot.HasteTime, enemySlot.SlowTime, enemySlot.FreezeTime);
                 }
                 else
                 {

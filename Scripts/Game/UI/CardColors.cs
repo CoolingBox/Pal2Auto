@@ -10,6 +10,27 @@ public static class CardColors
     /// 不按"数值最大"判定——蛇涎蛊挂了 3 点伤害，但它的身份是毒，边框该是绿。</summary>
     public static Color PrimaryColor(CardConfig card)
     {
+        if (card.MultiCount > 1)
+        {
+            return UiKit.MultiMagenta;
+        }
+        if (card.HasteCount > 0)
+        {
+            return UiKit.HasteGreen;
+        }
+        if (card.FreezeCount > 0)
+        {
+            return UiKit.FreezeIce;
+        }
+        if (card.SlowCount > 0)
+        {
+            return UiKit.SlowBlue;
+        }
+        if (card.ChargeCount > 0)
+        {
+            return UiKit.ChargeGold;
+        }
+
         if (card.Type == CardType.Spell)
         {
             return ElementColor(card.Element);
@@ -123,6 +144,27 @@ public static class CardColors
     {
         string text = "";
 
+        if (card.MultiCount > 1)
+        {
+            text += Tag(UiKit.MultiMagenta, "重" + card.MultiCount);
+        }
+        if (card.HasteCount > 0)
+        {
+            text += Tag(UiKit.HasteGreen, "速" + card.HasteCount + "·" + Short(card.HasteTime) + "s");
+        }
+        if (card.SlowCount > 0)
+        {
+            text += Tag(UiKit.SlowBlue, "缓" + card.SlowCount + "·" + Short(card.SlowTime) + "s");
+        }
+        if (card.FreezeCount > 0)
+        {
+            text += Tag(UiKit.FreezeIce, "冻" + card.FreezeCount + "·" + Short(card.FreezeTime) + "s");
+        }
+        if (card.ChargeCount > 0)
+        {
+            text += Tag(UiKit.ChargeGold, "充" + card.ChargeCount);
+        }
+
         if (card.HandSelf != 0 || card.HandFoe != 0)
         {
             text += Tag(UiKit.HandTeal, HandBody(card));
@@ -184,6 +226,12 @@ public static class CardColors
         return body;
     }
 
+    /// <summary>秒数去掉多余的 .0：6 秒写 "6"，2.5 秒写 "2.5"。</summary>
+    private static string Short(float seconds)
+    {
+        return seconds.ToString("0.#");
+    }
+
     private static string Sign(int value)
     {
         if (value > 0)
@@ -212,6 +260,26 @@ public static class CardColors
     public static string EffectSummary(CardConfig card)
     {
         string summary = "";
+        if (card.MultiCount > 1)
+        {
+            summary += "多重 " + card.MultiCount + "　";
+        }
+        if (card.HasteCount > 0)
+        {
+            summary += "加速 " + card.HasteCount + " 张 " + Short(card.HasteTime) + " 秒　";
+        }
+        if (card.SlowCount > 0)
+        {
+            summary += "减速 " + card.SlowCount + " 张 " + Short(card.SlowTime) + " 秒　";
+        }
+        if (card.FreezeCount > 0)
+        {
+            summary += "冰冻 " + card.FreezeCount + " 张 " + Short(card.FreezeTime) + " 秒　";
+        }
+        if (card.ChargeCount > 0)
+        {
+            summary += "充能 " + card.ChargeCount + " 张　";
+        }
         if (card.HandSelf != 0 || card.HandFoe != 0)
         {
             summary += "上场 " + HandBody(card) + "　";

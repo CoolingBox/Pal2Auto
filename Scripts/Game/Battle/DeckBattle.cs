@@ -25,6 +25,10 @@ public enum BattleEventKind
     Poison,     // 中毒结算/叠加（Side = 受影响方）
     Expose,     // 破绽叠层（Side = 受影响方）
     HandMod,    // 上场数变化（Side = 受影响方，Value = 变化后的值）
+    Haste,      // 加速施加（Side = 受益方，Value = 影响张数，Duration = 持续秒数）
+    Slow,       // 减速施加（同上）
+    Freeze,     // 冰冻施加（同上）
+    Charge,     // 充能（Side = 受益方，Value = 影响张数）
     End,
 }
 
@@ -48,6 +52,9 @@ public struct BattleEvent
 
     /// <summary>上场数事件是不是"限时到期收回"（日志措辞不同）。</summary>
     public bool Revert;
+
+    /// <summary>增益/减益的持续秒数（加速、减速、冰冻用）。</summary>
+    public float Duration;
 }
 
 /// <summary>一方的战斗统计。界面"统计"页与结算面板都读这里，不各自再算一份。</summary>
@@ -81,6 +88,41 @@ public sealed class HandSlot
     public CardConfig Card;
     public float Countdown;
     public float CountdownMax;
+
+    /// <summary>加速剩余秒数（蓄势速度 ×2）。</summary>
+    public float HasteTime;
+
+    /// <summary>减速剩余秒数（蓄势速度 ×0.5）。</summary>
+    public float SlowTime;
+
+    /// <summary>冰冻剩余秒数：期间不自然蓄势，也不能打出（可被充能）。</summary>
+    public float FreezeTime;
+
+    /// <summary>打出后的补抽冷却：归零才补下一张。多重会按结算次数拉长。</summary>
+    public float RefillCooldown;
+
+    /// <summary>当前蓄势速度倍率。加速与减速同时存在时相乘，正好抵消回 1。</summary>
+    public float SpeedMul
+    {
+        get
+        {
+            float mul = 1f;
+            if (HasteTime > 0f)
+            {
+                mul *= 2f;
+            }
+            if (SlowTime > 0f)
+            {
+                mul *= 0.5f;
+            }
+            return mul;
+        }
+    }
+
+    public bool Frozen
+    {
+        get { return FreezeTime > 0f; }
+    }
 
     public bool Occupied
     {
@@ -176,6 +218,9 @@ public sealed class DeckBattle
 
     /// <summary>护体上限。不封顶的话守牌会把伤害全吃掉，双方都打不死。</summary>
     public const int ShieldCap = 20;
+
+    /// <summary>每使用一次牌的补抽冷却。多重按结算次数累加：多重 2 = 0.5 秒。</summary>
+    public const float RefillPerPlay = 0.25f;
 
     public const int ExposeMaxStacks = 3;
     public const float ExposeDuration = 4f;
@@ -406,6 +451,10 @@ public sealed class DeckBattle
                 handSlot.Card = null;
                 handSlot.Countdown = 0f;
                 handSlot.CountdownMax = 0f;
+                handSlot.HasteTime = 0f;
+                handSlot.SlowTime = 0f;
+                handSlot.FreezeTime = 0f;
+                handSlot.RefillCooldown = 0f;
             }
         }
 
@@ -462,42 +511,100 @@ public sealed class DeckBattle
     {
         bool playedAny = false;
         int activeSlots = owner.ActiveSlots;
+
         for (int slot = 0; slot < activeSlots; slot++)
         {
             HandSlot handSlot = owner.Hand[slot];
+
+            // 空位：等补抽冷却走完再抽，这就是"用完一张要喘 0.25 秒"
             if (!handSlot.Occupied)
             {
+                if (handSlot.RefillCooldown <= 0f)
+                {
+                    continue;
+                }
+
+                handSlot.RefillCooldown -= dt;
+                if (handSlot.RefillCooldown <= 0f)
+                {
+                    handSlot.RefillCooldown = 0f;
+                    DrawInto(owner, slot, events);
+                }
                 continue;
             }
 
-            handSlot.Countdown -= dt;
+            if (handSlot.HasteTime > 0f)
+            {
+                handSlot.HasteTime = Mathf.Max(0f, handSlot.HasteTime - dt);
+            }
+            if (handSlot.SlowTime > 0f)
+            {
+                handSlot.SlowTime = Mathf.Max(0f, handSlot.SlowTime - dt);
+            }
+
+            // 冰冻：不自然蓄势，也不出手（充能仍然有效，因为它直接改 Countdown）
+            if (handSlot.FreezeTime > 0f)
+            {
+                handSlot.FreezeTime = Mathf.Max(0f, handSlot.FreezeTime - dt);
+                continue;
+            }
+
+            handSlot.Countdown -= dt * handSlot.SpeedMul;
             if (handSlot.Countdown > 0f)
             {
                 continue;
             }
 
-            CardConfig card = handSlot.Card;
-            ResolveCard(owner, foe, card, slot, events);
-
-            RoutePlayedCard(owner, card);
-            handSlot.Card = null;
-            handSlot.Countdown = 0f;
-
-            owner.Stats.Played++;
-            if (owner.Stats.FirstPlayAt < 0f)
-            {
-                owner.Stats.FirstPlayAt = Elapsed;
-            }
-
+            PlayCard(owner, foe, slot, events);
             playedAny = true;
-
-            DrawInto(owner, slot, events);
         }
 
         if (playedAny)
         {
             RevertExpiredMods(owner, events);
         }
+    }
+
+    /// <summary>
+    /// 打出一张牌：多重结算 N 次，然后进堆、清空槽位、挂上补抽冷却。
+    /// 冷却 = 0.25 秒 × 结算次数，所以多重牌虽然一次打两下，回收也更慢。
+    /// </summary>
+    private void PlayCard(FighterState owner, FighterState foe, int slot, List<BattleEvent> events)
+    {
+        HandSlot handSlot = owner.Hand[slot];
+        CardConfig card = handSlot.Card;
+
+        int times = card.MultiCount > 0 ? card.MultiCount : 1;
+
+        BattleEvent playEvent = new BattleEvent();
+        playEvent.Kind = BattleEventKind.Play;
+        playEvent.Side = SideOf(owner);
+        playEvent.Slot = slot;
+        playEvent.Card = card;
+        playEvent.Value = times;
+        playEvent.Text = card.Name;
+        events.Add(playEvent);
+
+        for (int t = 0; t < times; t++)
+        {
+            ResolveCard(owner, foe, card, slot, events);
+        }
+
+        RoutePlayedCard(owner, card);
+
+        owner.Stats.Played++;
+        if (owner.Stats.FirstPlayAt < 0f)
+        {
+            owner.Stats.FirstPlayAt = Elapsed;
+        }
+
+        handSlot.Card = null;
+        handSlot.Countdown = 0f;
+        handSlot.CountdownMax = 0f;
+        handSlot.HasteTime = 0f;
+        handSlot.SlowTime = 0f;
+        handSlot.FreezeTime = 0f;
+        handSlot.RefillCooldown = RefillPerPlay * times;
     }
 
     /// <summary>打完的牌去哪：消耗堆 / 永久离库 / 弃牌堆。</summary>
@@ -525,13 +632,7 @@ public sealed class DeckBattle
 
     private void ResolveCard(FighterState owner, FighterState foe, CardConfig card, int slot, List<BattleEvent> events)
     {
-        BattleEvent playEvent = new BattleEvent();
-        playEvent.Kind = BattleEventKind.Play;
-        playEvent.Side = SideOf(owner);
-        playEvent.Slot = slot;
-        playEvent.Card = card;
-        playEvent.Text = card.Name;
-        events.Add(playEvent);
+        ApplyTimingEffects(owner, foe, card, slot, events);
 
         if (card.Damage > 0)
         {
@@ -638,6 +739,112 @@ public sealed class DeckBattle
             poison.Text = "中毒 +" + card.Poison;
             events.Add(poison);
         }
+    }
+
+    /// <summary>
+    /// 时机类效果。归属按"它该帮谁"来定：
+    /// 加速 / 充能作用于**自己**（帮自己更快出手）；
+    /// 减速 / 冰冻作用于**对面**（压住对方的出手节奏）。
+    /// 减速与加速互为反面，同时存在时速度相乘，2×0.5=1，正好抵消。
+    /// 张数不足时按实际有的张数生效，不空放。
+    /// </summary>
+    private void ApplyTimingEffects(FighterState owner, FighterState foe, CardConfig card, int playingSlot, List<BattleEvent> events)
+    {
+        if (card.HasteCount > 0 && card.HasteTime > 0f)
+        {
+            float time = card.HasteTime;
+            int applied = ApplyToRandomSlots(owner, playingSlot, card.HasteCount,
+                delegate (HandSlot target)
+                {
+                    target.HasteTime = Mathf.Max(target.HasteTime, time);
+                });
+            AddTimingEvent(events, owner, BattleEventKind.Haste, applied, time);
+        }
+
+        if (card.SlowCount > 0 && card.SlowTime > 0f)
+        {
+            float time = card.SlowTime;
+            int applied = ApplyToRandomSlots(foe, -1, card.SlowCount,
+                delegate (HandSlot target)
+                {
+                    target.SlowTime = Mathf.Max(target.SlowTime, time);
+                });
+            AddTimingEvent(events, foe, BattleEventKind.Slow, applied, time);
+        }
+
+        if (card.FreezeCount > 0 && card.FreezeTime > 0f)
+        {
+            float time = card.FreezeTime;
+            int applied = ApplyToRandomSlots(foe, -1, card.FreezeCount,
+                delegate (HandSlot target)
+                {
+                    target.FreezeTime = Mathf.Max(target.FreezeTime, time);
+                });
+            AddTimingEvent(events, foe, BattleEventKind.Freeze, applied, time);
+        }
+
+        if (card.ChargeCount > 0)
+        {
+            int applied = ApplyToRandomSlots(owner, playingSlot, card.ChargeCount,
+                delegate (HandSlot target)
+                {
+                    // 充能是直接推蓄势条，冰冻中也生效
+                    target.Countdown = Mathf.Max(0f, target.Countdown - 1f);
+                });
+            AddTimingEvent(events, owner, BattleEventKind.Charge, applied, 0f);
+        }
+    }
+
+    private int ApplyToRandomSlots(FighterState owner, int excludeSlot, int count, System.Action<HandSlot> apply)
+    {
+        List<int> candidates = new List<int>();
+        int slots = owner.ActiveSlots;
+        for (int i = 0; i < slots; i++)
+        {
+            if (i == excludeSlot)
+            {
+                continue;
+            }
+            if (!owner.Hand[i].Occupied)
+            {
+                continue;
+            }
+            candidates.Add(i);
+        }
+
+        for (int i = candidates.Count - 1; i > 0; i--)
+        {
+            int j = _rng.Next(i + 1);
+            int tmp = candidates[i];
+            candidates[i] = candidates[j];
+            candidates[j] = tmp;
+        }
+
+        int applied = 0;
+        for (int i = 0; i < candidates.Count && applied < count; i++)
+        {
+            apply(owner.Hand[candidates[i]]);
+            applied++;
+        }
+
+        return applied;
+    }
+
+    private void AddTimingEvent(List<BattleEvent> events, FighterState owner, BattleEventKind kind,
+        int count, float duration)
+    {
+        if (count <= 0)
+        {
+            return;
+        }
+
+        BattleEvent evt = new BattleEvent();
+        evt.Kind = kind;
+        evt.Side = SideOf(owner);
+        evt.Slot = -1;
+        evt.Value = count;
+        evt.Duration = duration;
+        events.Add(evt);
     }
 
     private void AddDamageEvent(FighterState owner, FighterState foe, int slot, CardConfig card,

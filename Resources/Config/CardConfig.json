@@ -360,5 +360,72 @@
     "Icon": "item_amulet2",
     "Desc": "盆里生财，十秒内双方上场各 +1。",
     "Keywords": "Exhaust"
+  },
+  {
+    "Id": 37,
+    "Name": "疾风符",
+    "Type": "Support",
+    "Countdown": 3.0,
+    "HasteCount": 2,
+    "HasteTime": 6,
+    "Keywords": "Exhaust",
+    "Icon": "item_talisman4",
+    "Desc": "符纸一燃，两步并作一步。我方随机 2 张牌，六秒内蓄势速度翻倍。"
+  },
+  {
+    "Id": 38,
+    "Name": "聚气丹",
+    "Type": "Support",
+    "Countdown": 2.6,
+    "ChargeCount": 3,
+    "Keywords": "Exhaust",
+    "Icon": "item_pill4",
+    "Desc": "丹入腹中，气随意走。我方随机 3 张牌立刻各前进一秒。"
+  },
+  {
+    "Id": 39,
+    "Name": "缚足钉",
+    "Type": "Support",
+    "Countdown": 3.2,
+    "SlowCount": 2,
+    "SlowTime": 5,
+    "Keywords": "Exhaust",
+    "Icon": "item_dart5",
+    "Desc": "三枚铁钉钉在地上走不动的脚。我方随机 2 张牌，五秒内蓄势减半。"
+  },
+  {
+    "Id": 40,
+    "Name": "寒冰咒",
+    "Type": "Support",
+    "Countdown": 3.6,
+    "FreezeCount": 2,
+    "FreezeTime": 4,
+    "Keywords": "Exhaust",
+    "Icon": "item_talisman5",
+    "Desc": "寒气封住经脉。我方随机 2 张牌，四秒内不能自然蓄势，化冻后才打得出（可被充能）。"
+  },
+  {
+    "Id": 41,
+    "Name": "连珠镖",
+    "Type": "Attack",
+    "Countdown": 2.2,
+    "Damage": 5,
+    "MultiCount": 2,
+    "Icon": "item_dart4",
+    "Desc": "一撒两枚，前后脚到。每次使用结算两次 5 点伤害，但回收也更慢。"
+  },
+  {
+    "Id": 42,
+    "Name": "惊雷令",
+    "Type": "Spell",
+    "Countdown": 3.4,
+    "HasteCount": 1,
+    "HasteTime": 4,
+    "ChargeCount": 2,
+    "Keywords": "Exhaust",
+    "Icon": "item_talisman6",
+    "Desc": "掌心雷落地成令。造成 8 点雷伤，我方随机 1 张牌四秒内双倍蓄势，另 2 张各前进一秒。",
+    "Element": "Thunder",
+    "Spell": 8
   }
 ]
