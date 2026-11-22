@@ -86,8 +86,10 @@ public class BattlePanel : BasePanel
 
     private PileView _enemyDraw;
     private PileView _enemyDiscard;
+    private PileView _enemyExhaust;
     private PileView _playerDraw;
     private PileView _playerDiscard;
+    private PileView _playerExhaust;
 
     private readonly List<string> _logLines = new List<string>();
     private bool _showLog;
@@ -332,8 +334,11 @@ public class BattlePanel : BasePanel
     /// </summary>
     private void BuildPiles()
     {
+        // 右侧放抽/弃两堆，左侧放消耗堆：消耗是本场"死了"的牌，和循环的两堆分开摆
+        _enemyExhaust = MakePile(10f, 88f);
         _enemyDraw = MakePile(882f, 88f);
         _enemyDiscard = MakePile(882f, 168f);
+        _playerExhaust = MakePile(10f, 256f);
         _playerDraw = MakePile(882f, 256f);
         _playerDiscard = MakePile(882f, 336f);
     }
@@ -569,10 +574,8 @@ public class BattlePanel : BasePanel
         List<int> deck = new List<int>();
         if (character != null && character.Deck != null && character.Deck.Length > 0)
         {
-            for (int i = 0; i < character.Deck.Length; i++)
-            {
-                deck.Add(character.Deck[i]);
-            }
+            // 配置表只读；「移除」关键字造成的永久损失记在 DeckProgress 里，这里扣掉
+            deck = DeckStore.BuildDeck(character.Id, character.Deck);
         }
         else
         {
@@ -616,7 +619,8 @@ public class BattlePanel : BasePanel
         _resultOverlay.Visible = false;
         SyncCards();
         RefreshStatus();
-        AddLogLine("开局：双方各抽 " + DeckBattle.HandBase + " 张，倒计时归零自动出手");
+        AddLogLine("开局：双方各抽 " + DeckBattle.HandBase + " 张（我方牌库 " + deck.Count +
+                   " 张），倒计时归零自动出手");
         RefreshLogView();
     }
 
@@ -811,6 +815,17 @@ public class BattlePanel : BasePanel
         _pending.Time = _battle.Elapsed;
         _pending.Who = WhoOf(evt.Side);
         _pending.Card = "「" + evt.Text + "」";
+        if (evt.Card != null)
+        {
+            if (evt.Card.HasKeyword(CardKeyword.Exhaust))
+            {
+                _pending.Card += C(new Color(0.560f, 0.700f, 0.780f), "耗");
+            }
+            else if (evt.Card.HasKeyword(CardKeyword.Remove))
+            {
+                _pending.Card += C(new Color(0.870f, 0.600f, 0.520f), "移");
+            }
+        }
         _pending.Detail = "";
     }
 
@@ -914,7 +929,8 @@ public class BattlePanel : BasePanel
         text += "毒伤 " + C(UiKit.PoisonGreen, st.PoisonDamage + "") +
                 "　破绽 " + C(UiKit.ExposeViolet, st.ExposeApplied + "") + "\n";
         text += "首手 " + C(UiKit.PaperDim, first) +
-                "　上场 " + C(UiKit.HandTeal, unit.ActiveSlots + "") + "\n";
+                "　上场 " + C(UiKit.HandTeal, unit.ActiveSlots + "") +
+                "　耗 " + C(new Color(0.560f, 0.700f, 0.780f), unit.ExhaustPile.Count + "") + "\n";
         return text;
     }
 
@@ -1000,6 +1016,8 @@ public class BattlePanel : BasePanel
         _enemyDiscard.SetPile("弃牌堆", e.DiscardPile.Count, e.DiscardPile, true, new Color(0.360f, 0.320f, 0.260f));
         _playerDraw.SetPile("抽牌堆", p.DrawPile.Count, p.DrawPile, false, new Color(0.560f, 0.460f, 0.280f));
         _playerDiscard.SetPile("弃牌堆", p.DiscardPile.Count, p.DiscardPile, true, new Color(0.400f, 0.350f, 0.280f));
+        _enemyExhaust.SetPile("消耗堆", e.ExhaustPile.Count, e.ExhaustPile, true, new Color(0.330f, 0.330f, 0.360f));
+        _playerExhaust.SetPile("消耗堆", p.ExhaustPile.Count, p.ExhaustPile, true, new Color(0.380f, 0.380f, 0.410f));
     }
 
     private static string BuildStatus(FighterState unit)
@@ -1083,6 +1101,13 @@ public class BattlePanel : BasePanel
             {
                 _resultBody.Text += "\n（左上「交战记录」可看逐手明细）";
             }
+        }
+
+        // 「移除」的牌在这里落盘：一场结束后从牌库永久去掉，下一场不再出现
+        if (_battle != null && _battle.RemovedCardIds.Count > 0)
+        {
+            DeckStore.AddRemoved(GameFlow.SelectedCharacterId, _battle.RemovedCardIds);
+            _battle.RemovedCardIds.Clear();
         }
 
         _resultOverlay.Visible = true;

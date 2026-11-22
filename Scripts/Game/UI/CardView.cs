@@ -17,6 +17,7 @@ public partial class CardView : Control
     private TextureRect _icon;
     private Label _name;
     private RichTextLabel _effects;
+    private RichTextLabel _keywords;
     private Label _cdCaption;
     private Label _countdown;
     private ColorRect _barBg;
@@ -69,6 +70,17 @@ public partial class CardView : Control
         _effects.AddThemeFontSizeOverride("normal_font_size", 18);
         _effects.AddThemeConstantOverride("line_separation", 0);
         AddChild(_effects);
+
+        // 关键字角标压在图标左上角：卡面已经排满，唯一能挂徽标又不挤走数值的位置
+        _keywords = new RichTextLabel();
+        _keywords.BbcodeEnabled = true;
+        _keywords.FitContent = false;
+        _keywords.ScrollActive = false;
+        _keywords.MouseFilter = MouseFilterEnum.Ignore;
+        _keywords.AddThemeFontOverride("normal_font", UiKit.GameFont);
+        _keywords.AddThemeFontSizeOverride("normal_font_size", 10);
+        _keywords.AddThemeConstantOverride("line_separation", 0);
+        AddChild(_keywords);
 
         _cdCaption = UiKit.MakeLabel("蓄 势", 10, new Color(0.560f, 0.510f, 0.420f));
         AddChild(_cdCaption);
@@ -123,6 +135,10 @@ public partial class CardView : Control
         _icon.Position = new Vector2(w * 0.09f, h * 0.012f);
         _icon.Size = new Vector2(w * 0.82f, h * 0.288f);
 
+        _keywords.Position = new Vector2(w * 0.055f, h * 0.022f);
+        _keywords.Size = new Vector2(w * 0.62f, h * 0.10f);
+        _keywords.AddThemeFontSizeOverride("normal_font_size", Mathf.Max(9, Mathf.RoundToInt(10f * f)));
+
         _name.AddThemeFontSizeOverride("font_size", Mathf.RoundToInt(15f * f) + 1);
         UiKit.Place(_name, w * 0.03f, h * 0.30f, w * 0.94f, h * 0.115f, HorizontalAlignment.Center);
 
@@ -159,6 +175,7 @@ public partial class CardView : Control
         _icon.Visible = true;
         _name.Text = card.Name;
         _effects.Text = "[center]" + CardColors.BuildEffectText(card) + "[/center]";
+        ApplyKeywordBadges(card);
         _cdCaption.Visible = true;
         _countdown.Text = card.Countdown.ToString("0.0");
 
@@ -181,6 +198,8 @@ public partial class CardView : Control
         _name.Text = "";
         _effects.Text = "";
         _cdCaption.Visible = false;
+        _keywords.Text = "";
+        _keywords.Visible = false;
         _countdown.Text = "";
         _barFill.Size = new Vector2(0f, _barH);
         _barFill.Color = new Color(0.620f, 0.470f, 0.240f);
@@ -188,6 +207,32 @@ public partial class CardView : Control
 
         _frame.AddThemeStyleboxOverride("panel",
             UiKit.Box(new Color(0.075f, 0.068f, 0.058f), new Color(0.240f, 0.210f, 0.170f), 1, 6));
+    }
+
+    /// <summary>关键字角标：耗 / 移 / 穿，单字 + 底色，缩到最小卡也读得出。</summary>
+    private void ApplyKeywordBadges(CardConfig card)
+    {
+        string text = "";
+        if (card.HasKeyword(CardKeyword.Exhaust))
+        {
+            text += Badge("#22303a", "#8fb6c9", "耗");
+        }
+        if (card.HasKeyword(CardKeyword.Remove))
+        {
+            text += Badge("#3d2020", "#df9d8b", "移");
+        }
+        if (card.HasKeyword(CardKeyword.Pierce))
+        {
+            text += Badge("#33301a", "#ddd08a", "穿");
+        }
+
+        _keywords.Text = text;
+        _keywords.Visible = text.Length > 0;
+    }
+
+    private static string Badge(string background, string foreground, string word)
+    {
+        return "[bgcolor=" + background + "][color=" + foreground + "] " + word + " [/color][/bgcolor] ";
     }
 
     public void SetCountdown(float progress, float remain)

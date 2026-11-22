@@ -1,5 +1,5 @@
 // 文件：CharacterSelectPanel.cs
-// 描述：选人界面 —— 六位侠客，左网格右详情。
+// 描述：选人界面 —— 四位侠客（王小虎 / 沈欺霜 / 苏媚 / 李忆如），左网格右详情。
 //       确认后只写入 GameFlow.SelectedCharacterId 并给出提示：摆摊界面还没做，不假装能进。
 
 using System.Collections.Generic;
@@ -11,7 +11,7 @@ public class CharacterSelectPanel : BasePanel
     private const float W = 960f;
     private const float H = 540f;
 
-    private const float CardWidth = 150f;
+    private const float CardWidth = 232f;
     private const float CardHeight = 184f;
     private const float CardGapX = 16f;
     private const float CardGapY = 12f;
@@ -36,7 +36,7 @@ public class CharacterSelectPanel : BasePanel
     private Label _detailStyle;
     private Label _detailSpecialty;
     private Label _detailDesc;
-    private readonly TextureRect[] _deckIcons = new TextureRect[12];
+    private readonly TextureRect[] _deckIcons = new TextureRect[16];
     private Label _deckSummary;
 
 
@@ -175,8 +175,8 @@ public class CharacterSelectPanel : BasePanel
     /// <summary>12 个牌位按 6 列 2 行摆开：一眼看出这套牌是快是慢、攻多还是守多。</summary>
     private void AddChildIcon(TextureRect icon, int index)
     {
-        int col = index % 6;
-        int row = index / 6;
+        int col = index % 7;
+        int row = index / 7;
         _root.AddChild(icon);
         icon.Position = new Vector2(DetailX + 16f + col * 30f, DetailY + 240f + row * 30f);
         icon.Size = new Vector2(28f, 28f);
@@ -195,8 +195,8 @@ public class CharacterSelectPanel : BasePanel
         {
             for (int i = 0; i < _characters.Count; i++)
             {
-                int col = i % 3;
-                int row = i / 3;
+                int col = i % 2;
+                int row = i / 2;
 
                 CharacterCardView card = new CharacterCardView();
                 card.Position = new Vector2(GridX + col * (CardWidth + CardGapX),
@@ -250,23 +250,21 @@ public class CharacterSelectPanel : BasePanel
         int guards = 0;
         int heals = 0;
         int poisons = 0;
+        int supports = 0;
 
-        for (int i = 0; i < _deckIcons.Length; i++)
+        int deckCount = 0;
+        if (cfg.Deck != null)
         {
-            if (cfg.Deck == null || i >= cfg.Deck.Length)
-            {
-                _deckIcons[i].Texture = null;
-                continue;
-            }
+            deckCount = cfg.Deck.Length;
+        }
 
+        for (int i = 0; i < deckCount; i++)
+        {
             CardConfig card = ConfigManager.GetOne<CardConfig>(cfg.Deck[i]);
             if (card == null)
             {
-                _deckIcons[i].Texture = null;
                 continue;
             }
-
-            _deckIcons[i].Texture = UiKit.LoadTexture("res://Resources/Image/Items/" + card.Icon + ".png");
 
             if (card.Type == CardType.Spell)
             {
@@ -284,14 +282,35 @@ public class CharacterSelectPanel : BasePanel
             {
                 poisons++;
             }
+            else if (card.Type == CardType.Support)
+            {
+                supports++;
+            }
             else
             {
                 weapons++;
             }
         }
 
-        _deckSummary.Text = "兵 " + weapons + " · 术 " + spells + " · 守 " + guards +
-                            " · 疗 " + heals + " · 毒 " + poisons;
+        // 图标位可能比牌少（16 格 vs 最多 14 张），够用就把多的清空
+        for (int i = 0; i < _deckIcons.Length; i++)
+        {
+            if (cfg.Deck == null || i >= cfg.Deck.Length)
+            {
+                _deckIcons[i].Texture = null;
+                continue;
+            }
+
+            CardConfig card = ConfigManager.GetOne<CardConfig>(cfg.Deck[i]);
+            if (card != null)
+            {
+                _deckIcons[i].Texture = UiKit.LoadTexture("res://Resources/Image/Items/" + card.Icon + ".png");
+            }
+        }
+
+        // 一行放得下才算配比：分隔点省掉，靠空格分组
+        _deckSummary.Text = "兵" + weapons + " 术" + spells + " 守" + guards +
+                            " 疗" + heals + " 毒" + poisons + " 器" + supports;
     }
 
     private CharacterConfig FindCharacter(int id)

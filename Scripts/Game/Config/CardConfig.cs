@@ -16,6 +16,22 @@ public enum CardType
     Support,  // 器物：改上场数（布袋、符咒、金石之类）
 }
 
+/// <summary>卡牌关键字。一张牌可以同时带多个（位标记）。</summary>
+[System.Flags]
+public enum CardKeyword
+{
+    None = 0,
+
+    /// <summary>消耗：打完进「消耗堆」，本场不再回到牌库。</summary>
+    Exhaust = 1,
+
+    /// <summary>移除：打完从牌库永久去掉（存进 DeckProgress，下一场也不会出现）。</summary>
+    Remove = 2,
+
+    /// <summary>贯穿：无视护体，直接扣气血。</summary>
+    Pierce = 4,
+}
+
 public enum SpellElement
 {
     None,
@@ -53,6 +69,14 @@ public class CardConfig : BaseConfig
     /// <summary>上场数改动的持续时间（秒）。0 = 本场一直生效；>0 = 到点自动收回。</summary>
     public float HandTime;
 
+    /// <summary>关键字（可多个）。JSON 里写 "Exhaust" 或 "Exhaust, Remove"。</summary>
+    public CardKeyword Keywords = CardKeyword.None;
+
     public string Icon = "";   // Resources/Image/Items/{Icon}.png
     public string Desc = "";
+
+    public bool HasKeyword(CardKeyword keyword)
+    {
+        return (Keywords & keyword) != 0;
+    }
 }

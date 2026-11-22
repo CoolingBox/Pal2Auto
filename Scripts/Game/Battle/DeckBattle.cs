@@ -118,6 +118,9 @@ public sealed class FighterState
 
     public HandSlot[] Hand;
 
+    /// <summary>消耗堆：带「消耗」关键字的牌打完进这里，本场不再洗回牌库。</summary>
+    public List<CardConfig> ExhaustPile = new List<CardConfig>();
+
     /// <summary>当前上场数（手牌槽位数）。基础 5，可被卡牌临时或本场改写。</summary>
     public int HandCapacity = DeckBattle.HandBase;
 
@@ -186,6 +189,9 @@ public sealed class DeckBattle
     public bool PlayerWon;
 
     public float Elapsed;
+
+    /// <summary>本场因「移除」关键字永久离库的牌（只记玩家侧）。战斗结束后写入 DeckProgress。</summary>
+    public List<int> RemovedCardIds = new List<int>();
 
     private readonly Random _rng = new Random();
 
@@ -473,7 +479,7 @@ public sealed class DeckBattle
             CardConfig card = handSlot.Card;
             ResolveCard(owner, foe, card, slot, events);
 
-            owner.DiscardPile.Add(card);
+            RoutePlayedCard(owner, card);
             handSlot.Card = null;
             handSlot.Countdown = 0f;
 
@@ -494,6 +500,29 @@ public sealed class DeckBattle
         }
     }
 
+    /// <summary>打完的牌去哪：消耗堆 / 永久离库 / 弃牌堆。</summary>
+    private void RoutePlayedCard(FighterState owner, CardConfig card)
+    {
+        if (card.HasKeyword(CardKeyword.Exhaust))
+        {
+            owner.ExhaustPile.Add(card);
+            return;
+        }
+
+        if (card.HasKeyword(CardKeyword.Remove))
+        {
+            // 不进任何堆：本场就此消失，同时记下来，战斗结束后从牌库永久去掉。
+            // 敌方牌组来自配置表，不记（记了也没处落）。
+            if (ReferenceEquals(owner, Player))
+            {
+                RemovedCardIds.Add(card.Id);
+            }
+            return;
+        }
+
+        owner.DiscardPile.Add(card);
+    }
+
     private void ResolveCard(FighterState owner, FighterState foe, CardConfig card, int slot, List<BattleEvent> events)
     {
         BattleEvent playEvent = new BattleEvent();
@@ -507,7 +536,8 @@ public sealed class DeckBattle
         if (card.Damage > 0)
         {
             int absorbed;
-            int dealt = ApplyDamage(foe, card.Damage, card.IgnoreShield, out absorbed);
+            bool pierce = card.IgnoreShield || card.HasKeyword(CardKeyword.Pierce);
+            int dealt = ApplyDamage(foe, card.Damage, pierce, out absorbed);
             AddDamageEvent(owner, foe, slot, card, dealt, absorbed, SpellElement.None, events);
         }
 

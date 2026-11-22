@@ -53,7 +53,8 @@
     "Damage": 7,
     "IgnoreShield": true,
     "Icon": "item_dart2",
-    "Desc": "7 点伤害，无视护体。"
+    "Desc": "7 点伤害，无视护体。",
+    "Keywords": "Pierce"
   },
   {
     "Id": 7,
@@ -100,7 +101,8 @@
     "Element": "Fire",
     "Spell": 12,
     "Icon": "item_talisman_atk",
-    "Desc": "火象法术，12 点火焰伤害。"
+    "Desc": "火象法术，12 点火焰伤害。",
+    "Keywords": "Exhaust"
   },
   {
     "Id": 12,
@@ -111,7 +113,8 @@
     "Spell": 16,
     "Poison": 1,
     "Icon": "item_dart3",
-    "Desc": "火象法术，16 点伤害并附 1 层中毒。"
+    "Desc": "火象法术，16 点伤害并附 1 层中毒。",
+    "Keywords": "Exhaust"
   },
   {
     "Id": 13,
@@ -198,7 +201,8 @@
     "Heal": 8,
     "Shield": 4,
     "Icon": "item_pill",
-    "Desc": "回复 8 点气血并加 4 点护体。"
+    "Desc": "回复 8 点气血并加 4 点护体。",
+    "Keywords": "Exhaust"
   },
   {
     "Id": 22,
@@ -207,7 +211,8 @@
     "Countdown": 4.0,
     "Heal": 14,
     "Icon": "item_pill2",
-    "Desc": "回复 14 点气血，蓄势长，救命用。"
+    "Desc": "回复 14 点气血，蓄势长，救命用。",
+    "Keywords": "Exhaust"
   },
   {
     "Id": 23,
@@ -255,7 +260,8 @@
     "Countdown": 3.4,
     "Poison": 4,
     "Icon": "item_dart",
-    "Desc": "4 层中毒，蓄势最长。"
+    "Desc": "4 层中毒，蓄势最长。",
+    "Keywords": "Exhaust"
   },
   {
     "Id": 28,
@@ -264,7 +270,8 @@
     "Countdown": 5.0,
     "Damage": 18,
     "Icon": "item_amulet",
-    "Desc": "18 点伤害，蓄势五秒。铃响一声，魂魄少一分。"
+    "Desc": "18 点伤害，蓄势五秒。铃响一声，魂魄少一分。",
+    "Keywords": "Remove"
   },
   {
     "Id": 29,
@@ -294,7 +301,8 @@
     "HandSelf": 1,
     "HandTime": 0,
     "Icon": "item_amulet",
-    "Desc": "锦囊一展，多摆一件家什。我方上场 +1，本场持续。蓄势慢。"
+    "Desc": "锦囊一展，多摆一件家什。我方上场 +1，本场持续。蓄势慢。",
+    "Keywords": "Exhaust"
   },
   {
     "Id": 32,
@@ -305,7 +313,8 @@
     "HandFoe": 1,
     "HandTime": 0,
     "Icon": "item_talisman3",
-    "Desc": "符化分身，两边都多占一手。双方上场 +1，本场持续。最慢的一张。"
+    "Desc": "符化分身，两边都多占一手。双方上场 +1，本场持续。最慢的一张。",
+    "Keywords": "Exhaust"
   },
   {
     "Id": 33,
@@ -315,7 +324,8 @@
     "HandFoe": -1,
     "HandTime": 0,
     "Icon": "item_talisman_guard",
-    "Desc": "束住对面手脚。敌方上场 -1，本场持续。"
+    "Desc": "束住对面手脚。敌方上场 -1，本场持续。",
+    "Keywords": "Exhaust"
   },
   {
     "Id": 34,
@@ -325,7 +335,8 @@
     "HandSelf": 2,
     "HandTime": 5,
     "Icon": "item_brush",
-    "Desc": "临时赶工，五秒内我方上场 +2，过时收回。"
+    "Desc": "临时赶工，五秒内我方上场 +2，过时收回。",
+    "Keywords": "Exhaust"
   },
   {
     "Id": 35,
@@ -335,7 +346,8 @@
     "HandFoe": -1,
     "HandTime": 6,
     "Icon": "item_poison2",
-    "Desc": "撒一把迷神药粉，六秒内敌方上场 -1。"
+    "Desc": "撒一把迷神药粉，六秒内敌方上场 -1。",
+    "Keywords": "Exhaust"
   },
   {
     "Id": 36,
@@ -346,6 +358,7 @@
     "HandFoe": 1,
     "HandTime": 10,
     "Icon": "item_amulet2",
-    "Desc": "盆里生财，十秒内双方上场各 +1。"
+    "Desc": "盆里生财，十秒内双方上场各 +1。",
+    "Keywords": "Exhaust"
   }
 ]

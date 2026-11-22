@@ -48,6 +48,12 @@ public static class DevShot
             {
                 RunLogClickTest(host);
             }
+            if (all[i] == "--resetdeck")
+            {
+                // 「移除」关键字会永久扣牌库，调试时用它复原
+                DeckStore.ResetAll();
+                GD.Print("RESETDECK 已清空永久移除记录");
+            }
             if (all[i].StartsWith("--sim="))
             {
                 RunSim(all[i].Substring(6), host);
