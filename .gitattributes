@@ -1,0 +1,36 @@
+# 换行策略：索引与工作区统一 LF。
+# 项目在 Windows 上开发，但 Godot 4 / .NET 8 / Git 三方都吃 LF，统一掉就不会再出现
+# 「LF will be replaced by CRLF」这一屏警告（.import / .tscn 尤其多）。
+* text=auto eol=lf
+
+# —— 明确按文本处理（diff 更好看）——
+*.cs         text eol=lf diff=csharp
+*.py         text eol=lf diff=python
+*.json       text eol=lf
+*.md         text eol=lf
+*.txt        text eol=lf
+*.gd         text eol=lf
+*.gdshader   text eol=lf
+*.tscn       text eol=lf
+*.tres       text eol=lf
+*.godot      text eol=lf
+*.cfg        text eol=lf
+*.import     text eol=lf
+*.uid        text eol=lf
+*.props      text eol=lf
+
+# —— 二进制：禁止换行转换与自动合并 ——
+*.png        binary
+*.jpg        binary
+*.jpeg       binary
+*.webp       binary
+*.bmp        binary
+*.tga        binary
+*.wav        binary
+*.ogg        binary
+*.mp3        binary
+*.ttf        binary
+*.otf        binary
+*.pck        binary
+*.zip        binary
+*.exe        binary

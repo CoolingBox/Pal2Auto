@@ -1,8 +1,31 @@
+# —— Godot ——
 .godot/
 .mono/
+*.translation
+export_presets.cfg
+
+# —— C# / .NET（Godot 打开项目时会自动重新生成，不进版本库）——
 bin/
 obj/
-.idea/
 .vs/
 *.user
-export_presets.cfg
+*.suo
+Pal2Auto.csproj
+Pal2Auto.sln
+*.csproj.user
+
+# —— 编辑器 ——
+.idea/
+.vscode/
+*.swp
+*~
+
+# —— 系统 ——
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# —— 调试产物 ——
+# DevShot 早期的临时输出，别再进版本库
+sim_debug.txt
+*.log
