@@ -1,0 +1,1005 @@
+// 文件：RunPanel.cs
+// 描述：局内主界面 —— 一天的六个时辰、集市货架、开战入口。
+//
+// 版面 960×540，与其它面板同一套坐标。
+//
+//   顶栏：第 N 天 · 第 M 时辰 ／ 六个时辰进度 ／ 银两 · 声望 · 胜场
+//   主体：按当前时辰类型切换
+//         Free        → 集市 / 奇遇 / 淬炉 三选一
+//         Shop        → 三格货架（按阶定价）+ 刷新 + 离开
+//         Encounter   → 敌人信息 + 开战
+//         Nemesis     → 同上，但输了扣声望
+//         Event/Forge → 尚未实装，只能离开（不假装做了）
+//   底栏：牌组张数 · 可合成组数 · 一句提示
+//
+// 规则来源：Docs/局内流程设计.md、Docs/卡牌等阶与商店.md。
+
+using System.Collections.Generic;
+using Godot;
+using TinyFramework;
+
+public class RunPanel : BasePanel
+{
+    private const float W = 960f;
+    private const float H = 540f;
+
+    private Control _root;
+    private Label _title;
+    private Label _stats;
+    private Control _pipRow;
+    private Control _body;
+    private Label _foot;
+
+    private readonly List<Panel> _pips = new List<Panel>();
+    private readonly List<Label> _pipTexts = new List<Label>();
+
+    private bool _built;
+
+    /// <summary>集市里的子视图：0 = 买卡，1 = 删牌选牌。</summary>
+    private int _shopMode;
+
+    public override void OnBind(Control control)
+    {
+        base.OnBind(control);
+        _root = control;
+        _root.Position = Vector2.Zero;
+        _root.Size = new Vector2(W, H);
+    }
+
+    public override void OnShow()
+    {
+        base.OnShow();
+
+        RunManager run = RunManager.Instance;
+        if (!run.HasActiveRun)
+        {
+            // 直接从别处进这个面板时兜底：按上次选的侠客开一局
+            GameFlow.EnsureRunStarted();
+            run.StartRun(GameFlow.SelectedCharacterId, 0);
+        }
+
+        if (!_built)
+        {
+            Build();
+            _built = true;
+        }
+
+        if (GameFlow.PendingOpenRemoval)
+        {
+            GameFlow.PendingOpenRemoval = false;
+            _shopMode = 1;
+        }
+        Refresh();
+    }
+
+    // —————————————————————— 静态框架 ——————————————————————
+
+    private void Build()
+    {
+        Panel bg = new Panel();
+        bg.Position = Vector2.Zero;
+        bg.Size = new Vector2(W, H);
+        bg.MouseFilter = Control.MouseFilterEnum.Ignore;
+        bg.AddThemeStyleboxOverride("panel",
+            UiKit.Box(new Color(0.070f, 0.062f, 0.052f), new Color(0.220f, 0.190f, 0.150f), 1, 0));
+        _root.AddChild(bg);
+
+        Panel header = new Panel();
+        header.Position = new Vector2(8f, 8f);
+        header.Size = new Vector2(W - 16f, 52f);
+        header.MouseFilter = Control.MouseFilterEnum.Ignore;
+        header.AddThemeStyleboxOverride("panel",
+            UiKit.Box(new Color(0.098f, 0.086f, 0.070f), new Color(0.260f, 0.220f, 0.160f), 1, 2));
+        _root.AddChild(header);
+
+        _title = UiKit.MakeLabel("", 17, UiKit.Paper);
+        UiKit.Place(_title, 24f, 16f, 300f, 32f);
+        _root.AddChild(_title);
+
+        _stats = UiKit.MakeLabel("", 14, UiKit.PaperDim);
+        UiKit.Place(_stats, W - 330f, 16f, 306f, 32f, HorizontalAlignment.Right);
+        _root.AddChild(_stats);
+
+        _pipRow = new Control();
+        _pipRow.Position = new Vector2(0f, 0f);
+        _pipRow.Size = new Vector2(W, 52f);
+        _pipRow.MouseFilter = Control.MouseFilterEnum.Ignore;
+        _root.AddChild(_pipRow);
+
+        for (int i = 0; i < DaySchedule.PhaseCount; i++)
+        {
+            Panel pip = new Panel();
+            pip.Position = new Vector2(352f + i * 36f, 14f);
+            pip.Size = new Vector2(28f, 24f);
+            pip.MouseFilter = Control.MouseFilterEnum.Ignore;
+            _pipRow.AddChild(pip);
+            _pips.Add(pip);
+
+            Label text = UiKit.MakeLabel((i + 1).ToString(), 12, UiKit.PaperDim);
+            UiKit.Place(text, 0f, 0f, 28f, 24f, HorizontalAlignment.Center);
+            pip.AddChild(text);
+            _pipTexts.Add(text);
+        }
+
+        _body = new Control();
+        _body.Position = new Vector2(0f, 68f);
+        _body.Size = new Vector2(W, 408f);
+        _body.MouseFilter = Control.MouseFilterEnum.Ignore;
+        _root.AddChild(_body);
+
+        _foot = UiKit.MakeLabel("", 12, UiKit.PaperDim);
+        UiKit.Place(_foot, 24f, H - 34f, W - 48f, 24f);
+        _root.AddChild(_foot);
+    }
+
+    // —————————————————————— 刷新 ——————————————————————
+
+    private void Refresh()
+    {
+        RunState state = RunManager.Instance.Current;
+        if (state == null)
+        {
+            _title.Text = "未开局";
+            return;
+        }
+
+        DayPhase phase = state.Today.Current;
+        if (phase == null)
+        {
+            _title.Text = "第 " + state.Day + " 天 · 已结算";
+        }
+        else
+        {
+            _title.Text = "第 " + state.Day + " 天 · 第 " + phase.Index + " 时辰 · " +
+                PhaseTypeExtensions.Name(phase.Type);
+        }
+
+        _stats.Text = "气血 " + state.MaxHp + "　银两 " + state.Gold + "　声望 " + state.Renown +
+            "　胜 " + state.Victories + "/" + RunState.TargetVictories;
+
+        RefreshPips(state);
+        BuildBody(state, phase);
+
+        int mergeable = state.MergeableCards().Count;
+        _foot.Text = "牌组 " + state.Deck.Count + " 张" +
+            (mergeable > 0 ? "　可合成 " + mergeable + " 组（2 张同名同阶 → 高一阶）" : "") +
+            "　·　阅历 " + state.Level + " 级（" + state.Experience + "/" + RunState.ExpPerLevel + "）";
+    }
+
+    private void RefreshPips(RunState state)
+    {
+        for (int i = 0; i < _pips.Count; i++)
+        {
+            DayPhase phase = state.Today.Get(i + 1);
+            Color fill = new Color(0.090f, 0.080f, 0.066f);
+            Color border = new Color(0.200f, 0.175f, 0.140f);
+            Color textColor = UiKit.Dim;
+
+            if (phase != null && phase.Resolved)
+            {
+                fill = new Color(0.150f, 0.130f, 0.100f);
+                border = new Color(0.400f, 0.330f, 0.220f);
+                textColor = UiKit.PaperDim;
+            }
+
+            DayPhase current = state.Today.Current;
+            if (current != null && phase == current)
+            {
+                fill = new Color(0.280f, 0.210f, 0.120f);
+                border = UiKit.Gold;
+                textColor = UiKit.Paper;
+            }
+
+            // 遭遇与宿敌用红边，一眼看出哪两个时辰要打
+            if (phase != null && PhaseTypeExtensions.IsCombat(phase.Type))
+            {
+                border = new Color(0.480f, 0.260f, 0.220f);
+            }
+
+            _pips[i].AddThemeStyleboxOverride("panel", UiKit.Box(fill, border, 1, 2));
+            _pipTexts[i].AddThemeColorOverride("font_color", textColor);
+        }
+    }
+
+    private void ClearBody()
+    {
+        for (int i = _body.GetChildCount() - 1; i >= 0; i--)
+        {
+            Node child = _body.GetChild(i);
+            _body.RemoveChild(child);
+            child.QueueFree();
+        }
+    }
+
+    private void BuildBody(RunState state, DayPhase phase)
+    {
+        ClearBody();
+
+        if (state.IsOver)
+        {
+            BuildOutcome(state);
+            return;
+        }
+
+        // 升级奖励没选完就不能干别的（连升两级会有多轮）
+        if (state.PendingRewards.Count > 0)
+        {
+            BuildLevelRewards(state);
+            return;
+        }
+
+        if (phase == null)
+        {
+            return;
+        }
+
+        if (phase.Type == PhaseType.Free)
+        {
+            BuildFreeChoice();
+        }
+        else if (phase.Type == PhaseType.Shop)
+        {
+            BuildShop(state, phase);
+        }
+        else if (phase.Type == PhaseType.Event || phase.Type == PhaseType.Forge)
+        {
+            BuildPlaceholder(phase);
+        }
+        else if (phase.Type == PhaseType.Encounter || phase.Type == PhaseType.Nemesis)
+        {
+            BuildCombat(state, phase);
+        }
+        else if (phase.Type == PhaseType.Passed)
+        {
+            BuildPassed(phase);
+        }
+    }
+
+    // —————————————————————— 自由三选一 ——————————————————————
+
+    /// <summary>
+    /// 升级三选一。待选列表非空时，主体区只画这三张 —— 玩家必须先选完才能继续当天。
+    /// 气血上限的固定收益已经在上面的「气血 → N」里生效，这里选的是额外那一份。
+    /// </summary>
+    private void BuildLevelRewards(RunState state)
+    {
+        Label title = UiKit.MakeLabel("阅历 " + state.Level + " 级　选一项", 20, UiKit.Gold);
+        UiKit.Place(title, 0f, 34f, W, 32f, HorizontalAlignment.Center);
+        _body.AddChild(title);
+
+        Label note = UiKit.MakeLabel("气血上限 " + state.MaxHp + "（每级 +" + RunState.HpPerLevel + " 已经算进去了）",
+            12, UiKit.PaperDim);
+        UiKit.Place(note, 0f, 70f, W, 24f, HorizontalAlignment.Center);
+        _body.AddChild(note);
+
+        List<LevelReward> rewards = state.PendingRewards;
+        for (int i = 0; i < rewards.Count; i++)
+        {
+            float x = 156f + i * 224f;
+            Panel card = new Panel();
+            card.Position = new Vector2(x, 118f);
+            card.Size = new Vector2(200f, 176f);
+            card.AddThemeStyleboxOverride("panel",
+                UiKit.Box(new Color(0.115f, 0.100f, 0.078f), new Color(0.420f, 0.330f, 0.200f), 1, 3));
+            _body.AddChild(card);
+
+            Label name = UiKit.MakeLabel(rewards[i].Name, 22, UiKit.Paper);
+            UiKit.Place(name, 0f, 28f, 200f, 34f, HorizontalAlignment.Center);
+            card.AddChild(name);
+
+            Label desc = UiKit.MakeLabel(rewards[i].Desc, 12, UiKit.PaperDim);
+            UiKit.Place(desc, 12f, 72f, 176f, 44f, HorizontalAlignment.Center);
+            desc.AutowrapMode = TextServer.AutowrapMode.Arbitrary;
+            card.AddChild(desc);
+
+            Button button = UiKit.MakeButton("选　它", false);
+            button.Position = new Vector2(36f, 126f);
+            button.Size = new Vector2(128f, 34f);
+            LevelReward picked = rewards[i];
+            button.Pressed += () => OnPickLevelReward(picked);
+            card.AddChild(button);
+        }
+    }
+
+    private void OnPickLevelReward(LevelReward reward)
+    {
+        AudioManager.PlayUISFX("ui_click");
+        RunManager.Instance.Current.ApplyReward(reward);
+        Refresh();
+    }
+
+    private void BuildFreeChoice()
+    {        Label hint = UiKit.MakeLabel("这个时辰做什么？", 16, UiKit.PaperDim);
+        UiKit.Place(hint, 0f, 60f, W, 30f, HorizontalAlignment.Center);
+        _body.AddChild(hint);
+
+        string[] names = { "集　市", "奇　遇", "淬　炉" };
+        string[] subs =
+        {
+            "买　卡 · 刷　新",
+            "叙　事 · 收　益",
+            "免费附魔一次",
+        };
+        PhaseType[] types = { PhaseType.Shop, PhaseType.Event, PhaseType.Forge };
+
+        for (int i = 0; i < types.Length; i++)
+        {
+            float x = 156f + i * 224f;
+            Panel card = new Panel();
+            card.Position = new Vector2(x, 128f);
+            card.Size = new Vector2(200f, 168f);
+            card.AddThemeStyleboxOverride("panel",
+                UiKit.Box(new Color(0.105f, 0.092f, 0.074f), new Color(0.300f, 0.250f, 0.180f), 1, 3));
+            _body.AddChild(card);
+
+            Label name = UiKit.MakeLabel(names[i], 22, UiKit.Paper);
+            UiKit.Place(name, 0f, 34f, 200f, 34f, HorizontalAlignment.Center);
+            card.AddChild(name);
+
+            Label sub = UiKit.MakeLabel(subs[i], 11, UiKit.PaperDim);
+            UiKit.Place(sub, 12f, 74f, 176f, 40f, HorizontalAlignment.Center);
+            sub.AutowrapMode = TextServer.AutowrapMode.Arbitrary;
+            card.AddChild(sub);
+
+            Button button = UiKit.MakeButton("选　它", false);
+            button.Position = new Vector2(36f, 118f);
+            button.Size = new Vector2(128f, 34f);
+            PhaseType chosen = types[i];
+            button.Pressed += () => OnPickFreePhase(chosen);
+            card.AddChild(button);
+        }
+    }
+
+    private void OnPickFreePhase(PhaseType type)
+    {
+        AudioManager.PlayUISFX("ui_click");
+        if (RunManager.Instance.SelectFreePhase(type))
+        {
+            Refresh();
+        }
+    }
+
+    // —————————————————————— 集市 ——————————————————————
+
+    private void BuildShop(RunState state, DayPhase phase)
+    {
+        if (_shopMode == 1)
+        {
+            BuildRemovalList(state);
+            return;
+        }
+
+        ShopStock shop = state.Shop;
+
+        Label shopName = UiKit.MakeLabel(shop.ShopName, 20, UiKit.Gold);
+        UiKit.Place(shopName, 0f, 0f, W, 28f, HorizontalAlignment.Center);
+        _body.AddChild(shopName);
+
+        Label motto = UiKit.MakeLabel(shop.ShopMotto, 11, UiKit.PaperDim);
+        UiKit.Place(motto, 0f, 28f, W, 20f, HorizontalAlignment.Center);
+        _body.AddChild(motto);
+
+        for (int i = 0; i < shop.Offers.Count; i++)
+        {
+            BuildOfferCard(state, shop, shop.Offers[i], i);
+        }
+
+        if (shop.Offers.Count == 0)
+        {
+            Label empty = UiKit.MakeLabel("货架空了（这一格没抽到卡）", 14, UiKit.PaperDim);
+            UiKit.Place(empty, 0f, 180f, W, 30f, HorizontalAlignment.Center);
+            _body.AddChild(empty);
+        }
+
+        int cost = shop.NextRefreshCost;
+        string refreshText;
+        if (cost < 0)
+        {
+            refreshText = "今日已刷尽";
+        }
+        else if (cost == 0)
+        {
+            refreshText = "刷 新（免费）";
+        }
+        else
+        {
+            refreshText = "刷 新（" + cost + " 银两）";
+        }
+
+        Button refresh = UiKit.MakeButton(refreshText, false);
+        refresh.Position = new Vector2(330f, 280f);
+        refresh.Size = new Vector2(180f, 38f);
+        refresh.Disabled = cost < 0 || (cost > 0 && !state.CanAfford(cost));
+        refresh.Pressed += OnRefreshShop;
+        _body.AddChild(refresh);
+
+        Button leave = UiKit.MakeButton("离开集市", true);
+        leave.Position = new Vector2(530f, 280f);
+        leave.Size = new Vector2(140f, 38f);
+        leave.Pressed += OnLeavePhase;
+        _body.AddChild(leave);
+
+        string removeText = "删 牌（" + RunState.RemoveServiceCost + "）";
+        if (state.RemoveServiceUsed >= RunState.RemoveServiceMax)
+        {
+            removeText = "删牌已用完";
+        }
+        Button remove = UiKit.MakeButton(removeText, false);
+        remove.Position = new Vector2(690f, 280f);
+        remove.Size = new Vector2(150f, 38f);
+        remove.Disabled = !state.CanBuyRemoval;
+        remove.Pressed += OnOpenRemoval;
+        _body.AddChild(remove);
+
+        Label note = UiKit.MakeLabel("合成：两张同名同阶 + " + RunState.MergeCost + " 银两 → 一张高一阶",
+            11, UiKit.Dim);
+        UiKit.Place(note, 0f, 326f, W, 22f, HorizontalAlignment.Center);
+        _body.AddChild(note);
+    }
+
+    private void BuildOfferCard(RunState state, ShopStock shop, ShopOffer offer, int index)
+    {
+        if (offer == null || offer.Card == null)
+        {
+            return;
+        }
+
+        RunCard card = offer.Card;
+        Color accent = TierColor(card.Tier);
+
+        float x = 156f + index * 224f;
+        Panel frame = new Panel();
+        frame.Position = new Vector2(x, 54f);
+        frame.Size = new Vector2(200f, 208f);
+        frame.AddThemeStyleboxOverride("panel",
+            UiKit.Box(new Color(0.100f, 0.088f, 0.070f), accent, 1, 3));
+        _body.AddChild(frame);
+
+        // 阶位条
+        Panel tierBar = new Panel();
+        tierBar.Position = new Vector2(1f, 1f);
+        tierBar.Size = new Vector2(198f, 22f);
+        tierBar.MouseFilter = Control.MouseFilterEnum.Ignore;
+        tierBar.AddThemeStyleboxOverride("panel",
+            UiKit.Box(new Color(accent.R * 0.35f, accent.G * 0.35f, accent.B * 0.35f), accent, 1, 0));
+        frame.AddChild(tierBar);
+
+        Label tierLabel = UiKit.MakeLabel(CardTierRules.Name(card.Tier) + "阶", 12, accent);
+        UiKit.Place(tierLabel, 0f, 0f, 198f, 22f, HorizontalAlignment.Center);
+        tierBar.AddChild(tierLabel);
+
+        Label name = UiKit.MakeLabel(card.CardName, 18, UiKit.Paper);
+        UiKit.Place(name, 8f, 30f, 184f, 28f, HorizontalAlignment.Center);
+        name.ClipText = true;
+        frame.AddChild(name);
+
+        Label effect = UiKit.MakeLabel(EffectLine(card), 14, UiKit.Paper);
+        UiKit.Place(effect, 10f, 62f, 180f, 44f);
+        effect.AutowrapMode = TextServer.AutowrapMode.Arbitrary;
+        effect.VerticalAlignment = VerticalAlignment.Top;
+        frame.AddChild(effect);
+
+        Label cd = UiKit.MakeLabel("蓄势 " + card.Countdown.ToString("0.0") + " 秒", 11, UiKit.Dim);
+        UiKit.Place(cd, 10f, 108f, 180f, 18f);
+        frame.AddChild(cd);
+
+        string tagLine = KeywordLine(card);
+        if (tagLine.Length > 0)
+        {
+            Label tag = UiKit.MakeLabel(tagLine, 11, UiKit.Gold);
+            UiKit.Place(tag, 10f, 126f, 180f, 18f);
+            frame.AddChild(tag);
+        }
+
+        bool affordable = state.CanAfford(offer.Price) && !offer.Sold;
+        string buttonText;
+        if (offer.Sold)
+        {
+            buttonText = "已 售 出";
+        }
+        else if (affordable)
+        {
+            buttonText = "买　" + offer.Price + " 银两";
+        }
+        else
+        {
+            buttonText = "银两不够（" + offer.Price + "）";
+        }
+        Button buy = UiKit.MakeButton(buttonText, affordable);
+        buy.Position = new Vector2(16f, 158f);
+        buy.Size = new Vector2(168f, 34f);
+        buy.Disabled = !affordable;
+        int buyIndex = index;
+        buy.Pressed += () => OnBuy(buyIndex);
+        frame.AddChild(buy);
+    }
+
+    /// <summary>
+    /// 删牌：把整个牌组摊开，点哪张删哪张（60 银两，一局 5 次）。
+    /// 牌组厚到 26 张以上时，这是唯一的「把废卡换回空间」的手段，也是最直接的硬 sink。
+    /// </summary>
+    private void BuildRemovalList(RunState state)
+    {
+        string titleText = "删牌　花 " + RunState.RemoveServiceCost + " 银两去掉一张　（已用 " +
+            state.RemoveServiceUsed + "/" + RunState.RemoveServiceMax + "，现有 " + state.Gold + " 银两）";
+        if (state.Gold < RunState.RemoveServiceCost)
+        {
+            titleText += "　·　银两不足";
+        }
+        else if (state.RemoveServiceUsed >= RunState.RemoveServiceMax)
+        {
+            titleText += "　·　次数已用完";
+        }
+
+        Label title = UiKit.MakeLabel(titleText, 13, UiKit.Gold);
+        UiKit.Place(title, 24f, 2f, 650f, 24f);
+        _body.AddChild(title);
+
+        Button back = UiKit.MakeButton("返　回", false);
+        back.Position = new Vector2(700f, 2f);
+        back.Size = new Vector2(110f, 26f);
+        back.Pressed += OnCloseRemoval;
+        _body.AddChild(back);
+
+        int columns = 4;
+        float cellW = 216f;
+        float cellH = 38f;
+        float startX = 26f;
+        float startY = 36f;
+        float gapX = 8f;
+        float gapY = 6f;
+
+        for (int i = 0; i < state.Deck.Count; i++)
+        {
+            RunCard card = state.Deck[i];
+            int column = i % columns;
+            int row = i / columns;
+
+            float x = startX + column * (cellW + gapX);
+            float y = startY + row * (cellH + gapY);
+            if (y + cellH > 400f)
+            {
+                break;
+            }
+
+            string label = card.CardName + "·" + CardTierRules.Name(card.Tier);
+            Button button = UiKit.MakeButton(label, false);
+            button.Position = new Vector2(x, y);
+            button.Size = new Vector2(cellW, cellH);
+            int deckIndex = i;
+            button.Pressed += () => OnRemoveCard(deckIndex);
+            _body.AddChild(button);
+        }
+
+        Label hint = UiKit.MakeLabel("点一张牌即付银两删除，本局内不再出现；牌组越薄，关键牌越容易抽到",
+            11, UiKit.Dim);
+        UiKit.Place(hint, 0f, 386f, W, 20f, HorizontalAlignment.Center);
+        _body.AddChild(hint);
+    }
+
+    /// <summary>直接打开删牌列表。调试截图与「牌组整理」入口共用。</summary>
+    public void OpenRemoval()
+    {
+        _shopMode = 1;
+        Refresh();
+    }
+
+    private void OnOpenRemoval()
+    {
+        AudioManager.PlayUISFX("ui_click");
+        _shopMode = 1;
+        Refresh();
+    }
+
+    private void OnCloseRemoval()
+    {
+        AudioManager.PlayUISFX("ui_click");
+        _shopMode = 0;
+        Refresh();
+    }
+
+    private void OnRemoveCard(int index)
+    {
+        AudioManager.PlayUISFX("ui_click");
+        RunState state = RunManager.Instance.Current;
+        if (state == null)
+        {
+            return;
+        }
+        if (state.TryBuyRemoval(index))
+        {
+            Refresh();
+        }
+    }
+
+    private void OnBuy(int index)
+    {
+        AudioManager.PlayUISFX("ui_click");
+        RunState state = RunManager.Instance.Current;
+        if (state == null)
+        {
+            return;
+        }
+        if (state.BuyOffer(index))
+        {
+            Refresh();
+        }
+    }
+
+    private void OnRefreshShop()
+    {
+        AudioManager.PlayUISFX("ui_click");
+        RunState state = RunManager.Instance.Current;
+        if (state == null)
+        {
+            return;
+        }
+        if (state.TryRefreshShop())
+        {
+            Refresh();
+        }
+    }
+
+    // —————————————————————— 遭遇 / 宿敌 ——————————————————————
+
+    private void BuildCombat(RunState state, DayPhase phase)
+    {
+        bool nemesis = phase.Type == PhaseType.Nemesis;
+        EnemyConfig enemy = PickEnemy(state, nemesis);
+        if (enemy != null)
+        {
+            GameFlow.PendingEnemyId = enemy.Id;
+        }
+
+        // 气血按天数算，不读敌人表里的固定值。遭遇还没有做三选一，先按中间档。
+        int enemyHp = nemesis ? RunState.NemesisHp(state.Day) : RunState.EncounterHp(state.Day, 1);
+        GameFlow.PendingEnemyHp = enemyHp;
+
+        // 奖励按品阶发，所以要记下这一场打的是哪一档
+        if (enemy != null)
+        {
+            state.EncounterTier = enemy.Tier;
+        }
+
+        Label kind = UiKit.MakeLabel(nemesis ? "宿　敌" : "遭　遇", 20, nemesis ? UiKit.Vermilion : UiKit.Gold);
+        UiKit.Place(kind, 0f, 30f, W, 32f, HorizontalAlignment.Center);
+        _body.AddChild(kind);
+
+        if (enemy != null)
+        {
+            PortraitFrame frame = new PortraitFrame();
+            frame.Position = new Vector2((W - 150f) * 0.5f, 66f);
+            frame.Size = new Vector2(150f, 96f);
+            _body.AddChild(frame);
+            frame.SetShape(0.22f, 0.088f);
+            frame.SetGem(new Color(0.620f, 0.300f, 0.250f), true);
+            frame.SetAccent(new Color(0.520f, 0.352f, 0.228f));
+            frame.SetAntiAlias(SettingManager.Data.AntiAlias);
+            frame.SetPortrait(enemy.Portrait);
+
+            Label name = UiKit.MakeLabel(enemy.Name + "　" + RunState.TierName(state.EncounterTier) +
+                "　" + enemyHp + " 气血", 18, UiKit.Paper);
+            UiKit.Place(name, 0f, 172f, W, 30f, HorizontalAlignment.Center);
+            _body.AddChild(name);
+
+            Label title = UiKit.MakeLabel(enemy.Title, 12, UiKit.PaperDim);
+            UiKit.Place(title, 0f, 202f, W, 22f, HorizontalAlignment.Center);
+            _body.AddChild(title);
+        }
+
+        string warn;
+        if (nemesis)
+        {
+            warn = "胜：+" + state.NemesisReward + " 银两　负：扣 " + state.Day + " 点声望（现有 " + state.Renown + "）";
+        }
+        else
+        {
+            warn = "胜：+" + state.EncounterReward + " 银两 · 阅历 +" +
+                RunState.RewardExpOf(state.EncounterTier) + "　败：当天第 5 时辰空过";
+        }
+        Label warnLabel = UiKit.MakeLabel(warn, 13, UiKit.PaperDim);
+        UiKit.Place(warnLabel, 0f, 232f, W, 24f, HorizontalAlignment.Center);
+        _body.AddChild(warnLabel);
+
+        Button fight = UiKit.MakeButton("开　战", true);
+        fight.Position = new Vector2(400f, 272f);
+        fight.Size = new Vector2(160f, 46f);
+        fight.Pressed += OnFight;
+        _body.AddChild(fight);
+
+        Label note = UiKit.MakeLabel("每战满血。战斗用你当前的牌组（" + state.Deck.Count + " 张）。",
+            11, UiKit.Dim);
+        UiKit.Place(note, 0f, 328f, W, 22f, HorizontalAlignment.Center);
+        _body.AddChild(note);
+    }
+
+    /// <summary>
+    /// 暂时从全表随机一个敌人（现在 EnemyConfig 只有一条，等于固定打盗王查协）。
+    /// 真正的「按地区池抽、按品阶加权」要等 EncounterConfig 落地。
+    /// </summary>
+    private EnemyConfig PickEnemy(RunState state, bool nemesis)
+    {
+        List<EnemyConfig> all = ConfigManager.GetAll<EnemyConfig>();
+        if (all == null || all.Count == 0)
+        {
+            return null;
+        }
+        return all[state.Rng.Next(all.Count)];
+    }
+
+    private void OnFight()
+    {
+        AudioManager.PlayUISFX("ui_click");
+        DayPhase phase = RunManager.Instance.CurrentPhase;
+        if (phase == null)
+        {
+            return;
+        }
+
+        GameFlow.InRun = true;
+
+        UIManager.ShowPanel<BattlePanel>();
+        UIManager.HidePanel<RunPanel>();
+    }
+
+    // —————————————————————— 占位与结算 ——————————————————————
+
+    private void BuildPlaceholder(DayPhase phase)
+    {
+        string name = PhaseTypeExtensions.Name(phase.Type);
+        Label title = UiKit.MakeLabel(name + "　尚未实装", 20, UiKit.PaperDim);
+        UiKit.Place(title, 0f, 100f, W, 32f, HorizontalAlignment.Center);
+        _body.AddChild(title);
+
+        Label note = UiKit.MakeLabel(
+            phase.Type == PhaseType.Event
+                ? "奇遇要配事件表（师门传授 / 魔功捷径 / 异宝现世），表还没有。"
+                : "淬炉是免费附魔点（锋锐 / 疾风 / 厚土 / 蚀骨），界面还没有。",
+            12, UiKit.Dim);
+        UiKit.Place(note, 0f, 142f, W, 24f, HorizontalAlignment.Center);
+        _body.AddChild(note);
+
+        Button leave = UiKit.MakeButton("跳　过", true);
+        leave.Position = new Vector2(400f, 200f);
+        leave.Size = new Vector2(160f, 42f);
+        leave.Pressed += OnLeavePhase;
+        _body.AddChild(leave);
+    }
+
+    private void BuildPassed(DayPhase phase)
+    {
+        Label title = UiKit.MakeLabel("这一时辰已空过", 20, UiKit.PaperDim);
+        UiKit.Place(title, 0f, 120f, W, 32f, HorizontalAlignment.Center);
+        _body.AddChild(title);
+
+        Button next = UiKit.MakeButton("继　续", true);
+        next.Position = new Vector2(400f, 196f);
+        next.Size = new Vector2(160f, 42f);
+        next.Pressed += OnLeavePhase;
+        _body.AddChild(next);
+    }
+
+    private void BuildOutcome(RunState state)
+    {
+        string titleText = state.IsWon ? "十 胜 达 成" : "一 局 结 束";
+        Label title = UiKit.MakeLabel(titleText, 28, state.IsWon ? UiKit.Gold : UiKit.Vermilion);
+        UiKit.Place(title, 0f, 90f, W, 40f, HorizontalAlignment.Center);
+        _body.AddChild(title);
+
+        string body = "第 " + state.Day + " 天　胜 " + state.Victories + "/" + RunState.TargetVictories +
+            "　银两 " + state.Gold + "　牌组 " + state.Deck.Count + " 张";
+        Label detail = UiKit.MakeLabel(body, 14, UiKit.Paper);
+        UiKit.Place(detail, 0f, 142f, W, 26f, HorizontalAlignment.Center);
+        _body.AddChild(detail);
+
+        Button again = UiKit.MakeButton("再 走 一 趟", true);
+        again.Position = new Vector2(300f, 210f);
+        again.Size = new Vector2(160f, 44f);
+        again.Pressed += OnRestart;
+        _body.AddChild(again);
+
+        Button menu = UiKit.MakeButton("回 主 菜 单", false);
+        menu.Position = new Vector2(500f, 210f);
+        menu.Size = new Vector2(160f, 44f);
+        menu.Pressed += OnBackToMenu;
+        _body.AddChild(menu);
+    }
+
+    // —————————————————————— 通用操作 ——————————————————————
+
+    private void OnLeavePhase()
+    {
+        AudioManager.PlayUISFX("ui_click");
+        _shopMode = 0;
+        RunManager.Instance.ResolveCurrentPhase(true);
+        Refresh();
+    }
+
+    private void OnRestart()
+    {
+        AudioManager.PlayUISFX("ui_click");
+        RunManager.Instance.StartRun(GameFlow.SelectedCharacterId, 0);
+        Refresh();
+    }
+
+    private void OnBackToMenu()
+    {
+        AudioManager.PlayUISFX("ui_close");
+        RunManager.Instance.AbandonRun();
+        UIManager.ShowPanel<MainMenuPanel>();
+        UIManager.HidePanel<RunPanel>();
+    }
+
+    // —————————————————————— 文本与配色 ——————————————————————
+
+    private static Color TierColor(CardTier tier)
+    {
+        if (tier == CardTier.Copper)
+        {
+            return new Color(0.700f, 0.440f, 0.280f);
+        }
+        if (tier == CardTier.Silver)
+        {
+            return new Color(0.720f, 0.740f, 0.780f);
+        }
+        if (tier == CardTier.Gold)
+        {
+            return new Color(0.840f, 0.690f, 0.340f);
+        }
+        return new Color(0.440f, 0.750f, 0.840f);
+    }
+
+    private static string EnchantName(EnchantType type)
+    {
+        if (type == EnchantType.Sharp)
+        {
+            return "锋锐";
+        }
+        if (type == EnchantType.Swift)
+        {
+            return "疾风";
+        }
+        if (type == EnchantType.Sturdy)
+        {
+            return "厚土";
+        }
+        if (type == EnchantType.Venom)
+        {
+            return "蚀骨";
+        }
+        return "—";
+    }
+
+    private static string ScopeWord(TimingScope scope)
+    {
+        if (scope == TimingScope.Foe)
+        {
+            return "敌";
+        }
+        if (scope == TimingScope.Both)
+        {
+            return "双";
+        }
+        return "我";
+    }
+
+    /// <summary>关键词行：消耗 / 移除 / 贯穿 / 多重。没有关键词就返回空串。</summary>
+    private static string KeywordLine(RunCard card)
+    {
+        CardConfig cfg = card.Config;
+        if (cfg == null)
+        {
+            return "";
+        }
+
+        List<string> parts = new List<string>();
+        if (cfg.HasKeyword(CardKeyword.Exhaust))
+        {
+            parts.Add("消耗");
+        }
+        if (cfg.HasKeyword(CardKeyword.Remove))
+        {
+            parts.Add("移除");
+        }
+        if (cfg.HasKeyword(CardKeyword.Pierce))
+        {
+            parts.Add("贯穿");
+        }
+        if (parts.Count == 0)
+        {
+            return "";
+        }
+
+        string line = "";
+        for (int i = 0; i < parts.Count; i++)
+        {
+            if (i > 0)
+            {
+                line += " · ";
+            }
+            line += parts[i];
+        }
+        return line;
+    }
+
+    /// <summary>货架卡的效果行：用 RunCard 的按阶数值，不能读 CardConfig 的原始值。</summary>
+    private static string EffectLine(RunCard card)
+    {
+        List<string> parts = new List<string>();
+
+        if (card.Damage > 0)
+        {
+            parts.Add("攻 " + card.Damage);
+        }
+        if (card.Spell > 0)
+        {
+            parts.Add("法 " + card.Spell);
+        }
+        if (card.Shield > 0)
+        {
+            parts.Add("护 " + card.Shield);
+        }
+        if (card.Heal > 0)
+        {
+            parts.Add("疗 " + card.Heal);
+        }
+        if (card.Poison > 0)
+        {
+            parts.Add("毒 " + card.Poison);
+        }
+
+        CardConfig cfg = card.Config;
+        if (cfg != null)
+        {
+            if (cfg.Expose > 0)
+            {
+                parts.Add("破绽 " + cfg.Expose);
+            }
+            if (cfg.MultiCount > 1)
+            {
+                parts.Add("×" + cfg.MultiCount + " 次");
+            }
+            if (cfg.HandSelf != 0)
+            {
+                parts.Add("上场 " + (cfg.HandSelf > 0 ? "+" : "") + cfg.HandSelf);
+            }
+            if (cfg.HandFoe != 0)
+            {
+                parts.Add("敌上场 " + (cfg.HandFoe > 0 ? "+" : "") + cfg.HandFoe);
+            }
+            string scope = ScopeWord(cfg.Scope);
+            if (cfg.FreezeTime > 0f)
+            {
+                parts.Add(scope + "冰冻 " + cfg.FreezeTime.ToString("0.#") + " 秒");
+            }
+            if (cfg.HasteTime > 0f)
+            {
+                parts.Add(scope + "加速 " + cfg.HasteTime.ToString("0.#") + " 秒");
+            }
+            if (cfg.SlowTime > 0f)
+            {
+                parts.Add(scope + "减速 " + cfg.SlowTime.ToString("0.#") + " 秒");
+            }
+            if (cfg.ChargeCount > 0)
+            {
+                parts.Add("充能 " + cfg.ChargeCount + " 张");
+            }
+        }
+
+        if (parts.Count == 0)
+        {
+            return "—";
+        }
+
+        string line = "";
+        for (int i = 0; i < parts.Count; i++)
+        {
+            if (i > 0)
+            {
+                line += "　";
+            }
+            line += parts[i];
+        }
+        return line;
+    }
+}

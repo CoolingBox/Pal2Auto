@@ -56,7 +56,7 @@ Resources/
   Config/                    CharacterConfig.json / CardConfig.json / PortraitManifest.json
   Image/{Portrait,Items,Env} 40 张立绘 / 10 张物品图标 / 屋顶瓦片
   UI/*.tscn                  面板空壳（版面全在 C# 里铺）
-  Shaders/{xbrz,fade_bottom}.gdshader
+  Shaders/{portrait_frame,card_frame,icon_token,post_aa,fade_bottom}.gdshader
   Audio/{BGM,SFX}
 Docs/
   卡组战斗设计.md
@@ -68,7 +68,13 @@ Tools/                       （素材导入脚本在旧工程里，这里按需
 
 ## 画面
 
-960×540 离屏画布（SubViewport）→ `xbrz.gdshader` 放大到窗口；设置里可切成原像素。
+离屏画布（SubViewport，尺寸 = 960×540 × 内部渲染倍率）→ 原样贴到窗口。放大算法一律不做：整数倍最近邻（硬像素），画布大于窗口时线性缩小。清晰度由设置里的「画面精细度」控制。
+
+抗锯齿分两层，照 Unity URP 的分法（详见 `Docs/UI规格.md` 第十节）：
+
+- **管线层**：`portrait_frame.gdshader` 里的解析 AA（距离场 + `fwidth`），只治着色器画的边；MSAA 实测无效，不进菜单。
+- **后处理层**：`post_aa.gdshader`，FXAA / SMAA 两档，作用于贴屏那一层整幅画面。
+
 鼠标事件在 `GameRoot._Input` 里换算坐标后 `PushInput` 给离屏画布。
 
 ---
@@ -80,7 +86,9 @@ Tools/                       （素材导入脚本在旧工程里，这里按需
 --ui=battle           直接进战斗
 --ui=select           直接进选人
 --ui=settings         直接开设置
---no-xbrz             强制关闭放大滤镜（截图对比用）
+--render=N            强制内部渲染倍率（1 = 960x540，2 = 1920x1080；默认读设置）
+--no-aa               临时关闭解析抗锯齿（不改存档，截对比图用）
+--aa=off|analytic|fxaa|smaa|msaa   指定抗锯齿档位（截对比图用，不改存档）
 ```
 
 ---

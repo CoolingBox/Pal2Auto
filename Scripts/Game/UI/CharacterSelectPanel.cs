@@ -335,8 +335,12 @@ public class CharacterSelectPanel : BasePanel
     {
         AudioManager.PlayUISFX("ui_click");
         GameFlow.SelectedCharacterId = _selectedId;
+        GameFlow.InRun = true;
 
-        UIManager.ShowPanel<BattlePanel>();
+        // 选人即开局：这一局的天数、银两、声望、牌组都在 RunState 里，战斗只是其中一个时辰
+        RunManager.Instance.StartRun(_selectedId, 0);
+
+        UIManager.ShowPanel<RunPanel>();
         UIManager.HidePanel<CharacterSelectPanel>();
     }
 

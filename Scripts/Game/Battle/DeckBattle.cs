@@ -213,11 +213,18 @@ public sealed class DeckBattle
 
     /// <summary>上场数上限。界面按这个数建槽位，改这里要同步改 BattlePanel 的布局。</summary>
     public const int HandMax = 8;
-    public const float PoisonPerStackPerSecond = 1f;
+    /// <summary>
+    /// 每层毒每秒掉多少血。2026-11-24 从 1.0 降到 0.7：毒无视护体、不衰减、能叠 20 层，
+    /// 是全局最强的滚雪球，苏媚靠一张 82 灵蛇出洞就能把第 1~2 天打到 100%。
+    /// </summary>
+    public const float PoisonPerStackPerSecond = 0.5f;
     public const float TimeLimit = 60f;
 
     /// <summary>护体上限。不封顶的话守牌会把伤害全吃掉，双方都打不死。</summary>
     public const int ShieldCap = 20;
+
+    /// <summary>毒层上限。不封顶的话长战斗会变成「毒一发，敌人自己死」。</summary>
+    public const int PoisonMaxStacks = 20;
 
     /// <summary>每使用一次牌的补抽冷却。多重按结算次数累加：多重 2 = 0.5 秒。</summary>
     public const float RefillPerPlay = 0.25f;
@@ -253,12 +260,32 @@ public sealed class DeckBattle
 
     private readonly List<HandModifier> _handMods = new List<HandModifier>();
 
+    /// <summary>
+    /// 建一场战斗。playerHandCapacity > 0 时覆盖玩家的上场数（局内由阅历升级给到 6/7/8 槽），
+    /// 0 表示用默认的 HandBase = 5。敌方固定 5 槽。
+    /// </summary>
     public static DeckBattle Create(string playerName, string playerPortrait, int playerHp,
-        List<int> playerDeck, string enemyName, string enemyPortrait, int enemyHp, int[] enemyDeck)
+        List<int> playerDeck, string enemyName, string enemyPortrait, int enemyHp, int[] enemyDeck,
+        int playerHandCapacity = 0)
     {
         DeckBattle battle = new DeckBattle();
         battle.Player = BuildFighter(playerName, playerPortrait, playerHp, playerDeck);
         battle.Enemy = BuildFighter(enemyName, enemyPortrait, enemyHp, new List<int>(enemyDeck));
+
+        if (playerHandCapacity > 0)
+        {
+            int slots = playerHandCapacity;
+            if (slots < 1)
+            {
+                slots = 1;
+            }
+            if (slots > HandMax)
+            {
+                slots = HandMax;
+            }
+            battle.Player.HandCapacity = slots;
+        }
+
         battle.DrawOpeningHand();
         return battle;
     }
@@ -729,7 +756,7 @@ public sealed class DeckBattle
 
         if (card.Poison > 0)
         {
-            foe.PoisonStacks = Math.Min(20, foe.PoisonStacks + card.Poison);
+            foe.PoisonStacks = Math.Min(PoisonMaxStacks, foe.PoisonStacks + card.Poison);
 
             BattleEvent poison = new BattleEvent();
             poison.Kind = BattleEventKind.Poison;

@@ -29,11 +29,11 @@ public partial class BattleTicker : Control
     }
 }
 
-/// <summary>一条血条：底 + 填充 + 文字。</summary>
+/// <summary>一条血条：槽 + 填充 + 文字。</summary>
 public sealed class UiBar
 {
     public Panel Root;
-    public ColorRect Fill;
+    public Control Fill;
     public Label Text;
 }
 
@@ -128,6 +128,16 @@ public class BattlePanel : BasePanel
     public override void OnShow()
     {
         base.OnShow();
+        // 面板会复用：设置里改过抗锯齿要在这里重新同步，否则要重启才生效
+        bool antiAlias = SettingManager.Data.AntiAlias;
+        if (_playerPortrait != null)
+        {
+            _playerPortrait.SetAntiAlias(antiAlias);
+        }
+        if (_enemyPortrait != null)
+        {
+            _enemyPortrait.SetAntiAlias(antiAlias);
+        }
         StartBattle();
     }
 
@@ -185,9 +195,10 @@ public class BattlePanel : BasePanel
         _enemyPortrait.Position = new Vector2(418f, 2f);
         _enemyPortrait.Size = new Vector2(124f, 78f);
         _root.AddChild(_enemyPortrait);
-        _enemyPortrait.SetShape(0.26f, 0.082f);
-        _enemyPortrait.SetGem(new Color(0.860f, 0.420f, 0.320f), true);
-        _enemyPortrait.SetAccent(new Color(0.780f, 0.560f, 0.360f));
+        _enemyPortrait.SetShape(0.22f, 0.088f);
+        _enemyPortrait.SetGem(new Color(0.620f, 0.300f, 0.250f), true);
+        _enemyPortrait.SetAccent(new Color(0.520f, 0.352f, 0.228f));
+        _enemyPortrait.SetAntiAlias(SettingManager.Data.AntiAlias);
 
         _enemyName = UiKit.MakeLabel("", 17, new Color(0.900f, 0.760f, 0.620f));
         UiKit.Place(_enemyName, 556f, 4f, 230f, 20f);
@@ -210,9 +221,10 @@ public class BattlePanel : BasePanel
         _playerPortrait.Position = new Vector2(418f, 424f);
         _playerPortrait.Size = new Vector2(124f, 86f);
         _root.AddChild(_playerPortrait);
-        _playerPortrait.SetShape(0.25f, 0.078f);
-        _playerPortrait.SetGem(new Color(0.560f, 0.780f, 0.900f), true);
-        _playerPortrait.SetAccent(new Color(0.840f, 0.690f, 0.380f));
+        _playerPortrait.SetShape(0.22f, 0.088f);
+        _playerPortrait.SetGem(new Color(0.400f, 0.520f, 0.600f), true);
+        _playerPortrait.SetAccent(new Color(0.600f, 0.470f, 0.268f));
+        _playerPortrait.SetAntiAlias(SettingManager.Data.AntiAlias);
 
         _playerName = UiKit.MakeLabel("", 17, UiKit.Paper);
         UiKit.Place(_playerName, 556f, 420f, 230f, 20f);
@@ -244,23 +256,34 @@ public class BattlePanel : BasePanel
     {
         UiBar bar = new UiBar();
 
+        // 槽：近黑的凹槽 + 一圈暗金边，血条才不会像贴在背景上的一条色带
         Panel bg = new Panel();
         bg.Position = new Vector2(x, y);
         bg.Size = new Vector2(w, h);
         bg.MouseFilter = Control.MouseFilterEnum.Ignore;
         bg.AddThemeStyleboxOverride("panel",
-            UiKit.Box(new Color(0.070f, 0.064f, 0.056f), new Color(0.300f, 0.260f, 0.200f), 1, 3));
+            UiKit.Box(new Color(0.048f, 0.042f, 0.035f), new Color(0.230f, 0.190f, 0.140f), 1, 3));
         _root.AddChild(bg);
 
-        ColorRect fill = new ColorRect();
+        // 填充：顶边一道亮线当高光，底边不描 —— 槽底本来就暗，压一条线反而脏
+        Panel fill = new Panel();
         fill.Position = new Vector2(x + 2f, y + 2f);
         fill.Size = new Vector2(w - 4f, h - 4f);
-        fill.Color = fillColor;
         fill.MouseFilter = Control.MouseFilterEnum.Ignore;
+        StyleBoxFlat fillBox = new StyleBoxFlat();
+        fillBox.BgColor = fillColor;
+        fillBox.BorderColor = fillColor.Lightened(0.30f);
+        fillBox.BorderWidthTop = 1;
+        fillBox.SetCornerRadiusAll(2);
+        fill.AddThemeStyleboxOverride("panel", fillBox);
         _root.AddChild(fill);
 
-        Label text = UiKit.MakeLabel("", 11, UiKit.Paper);
-        UiKit.Place(text, x, y, w, h, HorizontalAlignment.Center);
+        // 数字不压在条上：满血时条是实心红色，11px 白字+描边会糊成一团。
+        // 挪到名字那一行的右端（名字左、血量右），条本身留干净。
+        Label text = UiKit.MakeLabel("", 12, UiKit.Paper);
+        text.AddThemeConstantOverride("outline_size", 3);
+        text.AddThemeColorOverride("font_outline_color", new Color(0.05f, 0.03f, 0.02f, 0.70f));
+        UiKit.Place(text, x, y - 20f, w, 18f, HorizontalAlignment.Right);
         _root.AddChild(text);
 
         bar.Root = bg;
@@ -547,10 +570,10 @@ public class BattlePanel : BasePanel
         _resultBody.AutowrapMode = TextServer.AutowrapMode.Arbitrary;
         _resultOverlay.AddChild(_resultBody);
 
-        Button back = UiKit.MakeButton("回 主 菜 单", true);
+        Button back = UiKit.MakeButton(GameFlow.InRun ? "回 日 程" : "回 主 菜 单", true);
         back.Position = new Vector2(380f, 332f);
         back.Size = new Vector2(200f, 46f);
-        back.Pressed += OnBackToMenu;
+        back.Pressed += OnResultConfirmed;
         _resultOverlay.AddChild(back);
     }
 
@@ -566,15 +589,29 @@ public class BattlePanel : BasePanel
             character = ConfigManager.GetOne<CharacterConfig>(1);
         }
 
-        EnemyConfig enemy = ConfigManager.GetOne<EnemyConfig>(1);
+        EnemyConfig enemy = ConfigManager.GetOne<EnemyConfig>(GameFlow.InRun ? GameFlow.PendingEnemyId : 1);
+        if (enemy == null)
+        {
+            enemy = ConfigManager.GetOne<EnemyConfig>(1);
+        }
         if (enemy == null)
         {
             TinyLog.Error("Battle", "缺少 EnemyConfig Id=1，无法开战");
             return;
         }
 
+        // 牌组来源：局内用 RunState 的牌组（买来的、合成过的都在里面）；
+        // 直接从主菜单进战斗时退回配置表，并扣掉 DeckProgress 里永久移除的卡。
         List<int> deck = new List<int>();
-        if (character != null && character.Deck != null && character.Deck.Length > 0)
+        RunManager run = RunManager.Instance;
+        if (GameFlow.InRun && run.HasActiveRun)
+        {
+            for (int i = 0; i < run.Current.Deck.Count; i++)
+            {
+                deck.Add(run.Current.Deck[i].CardId);
+            }
+        }
+        else if (character != null && character.Deck != null && character.Deck.Length > 0)
         {
             // 配置表只读；「移除」关键字造成的永久损失记在 DeckProgress 里，这里扣掉
             deck = DeckStore.BuildDeck(character.Id, character.Deck);
@@ -591,8 +628,28 @@ public class BattlePanel : BasePanel
         string portraitKey = character != null ? character.Portrait : "p01";
         string charName = character != null ? character.Name : "侠客";
 
-        _battle = DeckBattle.Create(charName, portraitKey, 120, deck,
-            enemy.Name, enemy.Portrait, enemy.Hp, enemy.Deck);
+        // 局内气血 = 基础 + 等级加成 + 铁骨奖励；局外（直接进战斗）退回配置值。
+        int playerHp = 200;
+        int playerSlots = 0;
+        if (GameFlow.InRun && run.HasActiveRun)
+        {
+            playerHp = run.Current.MaxHp;
+            playerSlots = run.Current.HandCapacity;
+        }
+        else if (character != null && character.Hp > 0)
+        {
+            playerHp = character.Hp;
+        }
+
+        // 局内敌血按天数算，敌人表里的 Hp 只是图鉴默认值。
+        int enemyHp = enemy.Hp;
+        if (GameFlow.PendingEnemyHp > 0)
+        {
+            enemyHp = GameFlow.PendingEnemyHp;
+        }
+
+        _battle = DeckBattle.Create(charName, portraitKey, playerHp, deck,
+            enemy.Name, enemy.Portrait, enemyHp, enemy.Deck, playerSlots);
 
         _accum = 0f;
         _endDelay = -1f;
@@ -1170,5 +1227,31 @@ public class BattlePanel : BasePanel
         AudioManager.PlayUISFX("ui_close");
         UIManager.ShowPanel<MainMenuPanel>();
         UIManager.HidePanel<BattlePanel>();
+    }
+
+    /// <summary>
+    /// 结算确认：局内就回日程并把这个时辰结算掉（胜负决定银两/声望/空过），
+    /// 不在局内（直接从主菜单进战斗调试）就回主菜单。
+    /// </summary>
+    private void OnResultConfirmed()
+    {
+        AudioManager.PlayUISFX("ui_click");
+
+        RunManager run = RunManager.Instance;
+        if (GameFlow.InRun && run.HasActiveRun)
+        {
+            bool won = _battle != null && _battle.PlayerWon;
+            DayPhase phase = run.CurrentPhase;
+            if (phase != null && PhaseTypeExtensions.IsCombat(phase.Type))
+            {
+                run.ResolveCurrentPhase(won);
+            }
+
+            UIManager.ShowPanel<RunPanel>();
+            UIManager.HidePanel<BattlePanel>();
+            return;
+        }
+
+        OnBackToMenu();
     }
 }

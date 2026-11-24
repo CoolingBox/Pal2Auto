@@ -40,6 +40,34 @@ public static class DevShot
             {
                 OpenBattleLater(host);
             }
+            if (all[i] == "--ui=run")
+            {
+                OpenRunLater(host, "free");
+            }
+            if (all[i] == "--ui=runshop")
+            {
+                OpenRunLater(host, "shop");
+            }
+            if (all[i] == "--ui=runfight")
+            {
+                OpenRunLater(host, "fight");
+            }
+            if (all[i] == "--ui=runremove")
+            {
+                OpenRunLater(host, "remove");
+            }
+            if (all[i] == "--ui=runlevel")
+            {
+                OpenRunLater(host, "level");
+            }
+            if (all[i] == "--ui=runlevel8")
+            {
+                OpenRunLater(host, "level8");
+            }
+            if (all[i] == "--ui=runbattle")
+            {
+                OpenRunLater(host, "battle");
+            }
             if (all[i] == "--clicktest")
             {
                 RunClickTest(host);
@@ -155,9 +183,35 @@ public static class DevShot
         EnemyConfig enemy = ConfigManager.GetOne<EnemyConfig>(1);
         if (character == null || enemy == null)
         {
-            GD.Print("SIM 配置缺失");
+            GD.Print("SIM 配置缺失 charId=" + charId);
+            System.Console.Out.Flush();
             host.GetTree().Quit(1);
             return;
+        }
+
+        // --simhp=N 临时覆盖敌方气血：扫平衡曲线时不用反复改 EnemyConfig.json
+        int enemyHp = ReadIntArg("--simhp=", enemy.Hp);
+        // --simmyhp=N 覆盖我方气血（默认取 CharacterConfig.Hp）
+        int playerHp = ReadIntArg("--simmyhp=", character.Hp > 0 ? character.Hp : 200);
+        bool logEach = ReadIntArg("--simlog=", 0) > 0;
+        // --simhand=N 覆盖上场数（模拟阅历升到 2/4/6 级之后的 6/7/8 槽）
+        int playerSlots = ReadIntArg("--simhand=", 0);
+
+        // --simdeck=143,143,... 用指定牌组顶掉角色自带牌组（测「买了几张之后能不能过」）
+        List<int> playerDeck = new List<int>(character.Deck);
+        string deckArg = ReadStringArg("--simdeck=", "");
+        if (deckArg.Length > 0)
+        {
+            playerDeck.Clear();
+            string[] ids = deckArg.Split(',');
+            for (int i = 0; i < ids.Length; i++)
+            {
+                int cardId;
+                if (int.TryParse(ids[i], out cardId))
+                {
+                    playerDeck.Add(cardId);
+                }
+            }
         }
 
         int wins = 0;
@@ -167,8 +221,8 @@ public static class DevShot
 
         for (int round = 0; round < rounds; round++)
         {
-            DeckBattle battle = DeckBattle.Create(character.Name, character.Portrait, 120,
-                new List<int>(character.Deck), enemy.Name, enemy.Portrait, enemy.Hp, enemy.Deck);
+            DeckBattle battle = DeckBattle.Create(character.Name, character.Portrait, playerHp,
+                new List<int>(playerDeck), enemy.Name, enemy.Portrait, enemyHp, enemy.Deck, playerSlots);
 
             while (!battle.Finished)
             {
@@ -190,12 +244,102 @@ public static class DevShot
             {
                 minHand = peak;
             }
+
+            // --simlog=1：逐场打印残局，用来判断「输是因为打不动还是挨不住」
+            if (logEach)
+            {
+                GD.Print("  R" + round + " 敌余 " + Mathf.RoundToInt(battle.Enemy.Hp) + " / 我余 " +
+                         Mathf.RoundToInt(battle.Player.Hp) + " / " + battle.Elapsed.ToString("0.0") + " 秒");
+            }
         }
 
-        GD.Print("SIM " + character.Name + " vs " + enemy.Name + "：" + rounds + " 场 " + wins + " 胜（" +
-                 Mathf.RoundToInt(100f * wins / rounds) + "%），均时 " +
-                 (totalTime / rounds).ToString("0.0") + " 秒，上场数区间 " + minHand + "~" + maxHand);
+        GD.Print("SIM " + character.Name + " vs " + enemy.Name + "(敌 " + enemyHp + " / 我 " + playerHp +
+                 " 血)：" + rounds + " 场 " + wins + " 胜（" + Mathf.RoundToInt(100f * wins / rounds) +
+                 "%），均时 " + (totalTime / rounds).ToString("0.0") + " 秒，上场数区间 " + minHand + "~" + maxHand);
+        // headless 下 Quit 紧跟 print 会丢掉标准输出缓冲，重定向到文件时看不到结果
+        System.Console.Out.Flush();
         host.GetTree().Quit(0);
+    }
+
+    /// <summary>局内面板的三个状态：自由时辰三选一 / 集市货架 / 遭遇时辰。</summary>
+    private static async void OpenRunLater(Node host, string mode)
+    {
+        GameFlow.SelectedCharacterId = ReadCharId();
+        GameFlow.InRun = true;
+
+        await host.ToSignal(host.GetTree().CreateTimer(0.3f), SceneTreeTimer.SignalName.Timeout);
+
+        RunManager run = RunManager.Instance;
+        run.StartRun(GameFlow.SelectedCharacterId, 0);
+
+        // --day=N 直接跳到第 N 天（验后期敌血曲线 / 界面对不对）
+        int dayOverride = ReadIntArg("--day=", 0);
+        if (dayOverride > 0)
+        {
+            run.Current.Day = dayOverride;
+        }
+
+        if (mode == "shop")
+        {
+            run.SelectFreePhase(PhaseType.Shop);
+        }
+        else if (mode == "remove")
+        {
+            // 删牌列表是集市里的子视图，得先开店
+            run.SelectFreePhase(PhaseType.Shop);
+        }
+        else if (mode == "fight")
+        {
+            // 推到第 3 时辰（固定遭遇）：前两个自由时辰各选一样并结算
+            run.SelectFreePhase(PhaseType.Shop);
+            run.ResolveCurrentPhase(true);
+            run.SelectFreePhase(PhaseType.Forge);
+            run.ResolveCurrentPhase(true);
+        }
+        else if (mode == "level")
+        {
+            // 升一级，停在「三选一奖励」界面
+            run.Current.GainExperience(RunState.ExpPerLevel);
+        }
+        else if (mode == "level8")
+        {
+            // 连升到 8 级：看满级槽位 / 气血，也顺手把三选一选掉
+            while (run.Current.Level < 8)
+            {
+                run.Current.GainExperience(RunState.ExpPerLevel);
+                if (run.Current.PendingRewards.Count > 0)
+                {
+                    run.Current.ApplyReward(run.Current.PendingRewards[0]);
+                }
+            }
+        }
+
+        if (mode == "remove")
+        {
+            GameFlow.PendingOpenRemoval = true;
+        }
+
+        TinyFramework.UIManager.ShowPanel<RunPanel>();
+        TinyFramework.UIManager.HidePanel<MainMenuPanel>();
+
+        if (mode == "remove")
+        {
+            GameFlow.PendingOpenRemoval = true;
+        }
+
+        // 局内直接开战：验证「战斗吃的是 RunState 的等级气血 + 当天敌血」
+        if (mode == "battle")
+        {
+            DayPhase phase = run.CurrentPhase;
+            int enemyHp = RunState.EncounterHp(run.Current.Day, 1);
+            if (phase != null && phase.Type == PhaseType.Nemesis)
+            {
+                enemyHp = RunState.NemesisHp(run.Current.Day);
+            }
+            GameFlow.PendingEnemyHp = enemyHp;
+            TinyFramework.UIManager.ShowPanel<BattlePanel>();
+            TinyFramework.UIManager.HidePanel<RunPanel>();
+        }
     }
 
     private static async void OpenBattleLater(Node host)
@@ -224,6 +368,38 @@ public static class DevShot
         return 1;
     }
 
+    /// <summary>读 `--xxx=123` 形式的整数参数，缺省时返回 fallback。</summary>
+    private static int ReadIntArg(string prefix, int fallback)
+    {
+        string[] args = OS.GetCmdlineArgs();
+        for (int i = 0; i < args.Length; i++)
+        {
+            if (args[i].StartsWith(prefix))
+            {
+                int parsed;
+                if (int.TryParse(args[i].Substring(prefix.Length), out parsed) && parsed > 0)
+                {
+                    return parsed;
+                }
+            }
+        }
+        return fallback;
+    }
+
+    /// <summary>读 `--xxx=abc` 形式的字符串参数，缺省时返回 fallback。</summary>
+    private static string ReadStringArg(string prefix, string fallback)
+    {
+        string[] args = OS.GetCmdlineArgs();
+        for (int i = 0; i < args.Length; i++)
+        {
+            if (args[i].StartsWith(prefix))
+            {
+                return args[i].Substring(prefix.Length);
+            }
+        }
+        return fallback;
+    }
+
     private static async void OpenSettingsLater(Node host)
     {
         await host.ToSignal(host.GetTree().CreateTimer(0.3f), SceneTreeTimer.SignalName.Timeout);
@@ -245,7 +421,8 @@ public static class DevShot
         Image image = host.GetViewport().GetTexture().GetImage();
         string path = "user://shot_" + DateTime.Now.ToString("HHmmss") + ".png";
         Error error = image.SavePng(path);
-        GD.Print("SHOT " + (error == Error.Ok ? "已保存 " : "保存失败 ") + ProjectSettings.GlobalizePath(path));
+        GD.Print("SHOT " + (error == Error.Ok ? "已保存 " : "保存失败 ") + ProjectSettings.GlobalizePath(path) +
+                 "（FPS " + Engine.GetFramesPerSecond() + "）");
 
         host.GetTree().Quit(0);
     }

@@ -13,15 +13,14 @@ public partial class CardView : Control
 {
     public int SlotIndex;
 
-    private Panel _frame;
+    private ColorRect _board;
+    private ShaderMaterial _boardMat;
     private TextureRect _icon;
     private Label _name;
     private RichTextLabel _effects;
     private RichTextLabel _keywords;
     private Label _cdCaption;
     private Label _countdown;
-    private ColorRect _barBg;
-    private ColorRect _barFill;
     private ColorRect _frost;
     private ColorRect _flash;
     private bool _built;
@@ -53,14 +52,24 @@ public partial class CardView : Control
 
         MouseFilter = MouseFilterEnum.Stop;
 
-        _frame = new Panel();
-        _frame.MouseFilter = MouseFilterEnum.Ignore;
-        AddChild(_frame);
+        // 牌面全部交给 card_frame.gdshader：斜面、内框线、底部凹槽和进度条都在里面画，
+        // 省掉一堆 ColorRect，也不用为了"看起来有做工"再叠三层 Panel。
+        _board = new ColorRect();
+        _board.MouseFilter = MouseFilterEnum.Ignore;
+        _board.Color = new Color(1f, 1f, 1f, 1f);
+        _boardMat = new ShaderMaterial();
+        _boardMat.Shader = ResourceLoader.Load<Shader>("res://Resources/Shaders/card_frame.gdshader");
+        _board.Material = _boardMat;
+        AddChild(_board);
 
         _icon = new TextureRect();
         _icon.ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize;
         _icon.StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered;
         _icon.MouseFilter = MouseFilterEnum.Ignore;
+        // 图标裁成圆牌：素材是方形画布里的圆形玉牌，不裁就是一块米色硬边方块
+        ShaderMaterial iconMat = new ShaderMaterial();
+        iconMat.Shader = ResourceLoader.Load<Shader>("res://Resources/Shaders/icon_token.gdshader");
+        _icon.Material = iconMat;
         AddChild(_icon);
 
         _name = UiKit.MakeLabel("", 15, UiKit.Paper);
@@ -93,16 +102,6 @@ public partial class CardView : Control
 
         _countdown = UiKit.MakeLabel("", 26, UiKit.Gold);
         AddChild(_countdown);
-
-        _barBg = new ColorRect();
-        _barBg.Color = new Color(0.060f, 0.055f, 0.048f);
-        _barBg.MouseFilter = MouseFilterEnum.Ignore;
-        AddChild(_barBg);
-
-        _barFill = new ColorRect();
-        _barFill.Color = new Color(0.620f, 0.470f, 0.240f);
-        _barFill.MouseFilter = MouseFilterEnum.Ignore;
-        AddChild(_barFill);
 
         // 冻霜：冰冻期间盖一层薄冰蓝，光看数字颜色不够直观
         _frost = new ColorRect();
@@ -142,11 +141,11 @@ public partial class CardView : Control
         // 字号缩放：132 宽为基准；缩到 0.62 以下就不再缩，否则汉字糊成墨点
         float f = Mathf.Clamp(w / 132f, 0.62f, 1f);
 
-        _frame.Position = Vector2.Zero;
-        _frame.Size = Size;
+        _board.Position = Vector2.Zero;
+        _board.Size = Size;
 
-        _icon.Position = new Vector2(w * 0.09f, h * 0.012f);
-        _icon.Size = new Vector2(w * 0.82f, h * 0.288f);
+        _icon.Position = new Vector2(w * 0.30f, h * 0.030f);
+        _icon.Size = new Vector2(w * 0.40f, h * 0.275f);
 
         _keywords.Position = new Vector2(w * 0.055f, h * 0.022f);
         _keywords.Size = new Vector2(w * 0.62f, h * 0.10f);
@@ -170,10 +169,13 @@ public partial class CardView : Control
         _barX = w * 0.09f;
         _barW = w * 0.82f;
 
-        _barBg.Position = new Vector2(_barX, _barY);
-        _barBg.Size = new Vector2(_barW, _barH);
-        _barFill.Position = new Vector2(_barX, _barY);
-        _barFill.Size = new Vector2(0f, _barH);
+        // 凹槽与进度条由着色器画，这里只把几何喂进去
+        _boardMat.SetShaderParameter("rect", new Vector2(w, h));
+        // 圆角只留 2px：老界面基本是直角，圆角一大就"现代"了
+        _boardMat.SetShaderParameter("corner", 2f);
+        _boardMat.SetShaderParameter("bar_h", _barH);
+        _boardMat.SetShaderParameter("bar_inset", _barX);
+        _boardMat.SetShaderParameter("bar_bottom", h - _barY - _barH);
 
         _frost.Position = Vector2.Zero;
         _frost.Size = Size;
@@ -196,9 +198,10 @@ public partial class CardView : Control
         _countdown.Text = card.Countdown.ToString("0.0");
 
         Color primary = CardColors.PrimaryColor(card);
-        _frame.AddThemeStyleboxOverride("panel",
-            UiKit.Box(CardColors.Tint(new Color(0.115f, 0.100f, 0.082f), primary, 0.16f), primary, 1, 6));
-        _barFill.Color = primary;
+        _boardMat.SetShaderParameter("slot_empty", 0f);
+        _boardMat.SetShaderParameter("accent", primary);
+        _boardMat.SetShaderParameter("bar_color", primary);
+        _boardMat.SetShaderParameter("bar", 0f);
 
         TooltipText = card.Name + "（蓄势 " + card.Countdown.ToString("0.0") + " 秒）\n" +
                       CardColors.EffectSummary(card) + "\n" + card.Desc;
@@ -218,15 +221,17 @@ public partial class CardView : Control
         _hasted = false;
         _slowed = false;
         _frost.Visible = false;
+        // 打出瞬间会闪一下再变空槽；不关掉的话，空槽会顶着一层没退干净的暖光，看着比牌还亮
+        _flash.Visible = false;
+        _flash.Modulate = new Color(1f, 1f, 1f, 1f);
         _keywords.Text = "";
         _keywords.Visible = false;
         _countdown.Text = "";
-        _barFill.Size = new Vector2(0f, _barH);
-        _barFill.Color = new Color(0.620f, 0.470f, 0.240f);
+        _boardMat.SetShaderParameter("slot_empty", 1f);
+        _boardMat.SetShaderParameter("bar", 0f);
+        _boardMat.SetShaderParameter("accent", new Color(0.300f, 0.280f, 0.240f));
+        _boardMat.SetShaderParameter("bar_color", new Color(0.300f, 0.280f, 0.240f));
         TooltipText = "";
-
-        _frame.AddThemeStyleboxOverride("panel",
-            UiKit.Box(new Color(0.075f, 0.068f, 0.058f), new Color(0.240f, 0.210f, 0.170f), 1, 6));
     }
 
     /// <summary>关键字角标：耗 / 移 / 穿，单字 + 底色，缩到最小卡也读得出。</summary>
@@ -277,7 +282,7 @@ public partial class CardView : Control
         }
 
         _countdown.Text = remain.ToString("0.0");
-        _barFill.Size = new Vector2(Mathf.Round(_barW * Mathf.Clamp(progress, 0f, 1f)), _barH);
+        _boardMat.SetShaderParameter("bar", Mathf.Clamp(progress, 0f, 1f));
 
         Color color = UiKit.Gold;
         if (_frozen)
@@ -287,7 +292,7 @@ public partial class CardView : Control
         else if (remain <= 0.6f)
         {
             // 快出手时数字转亮，制造"要打了"的预期
-            color = new Color(1f, 0.94f, 0.78f);
+            color = new Color(0.945f, 0.870f, 0.680f);
         }
         else if (_hasted)
         {
@@ -300,6 +305,7 @@ public partial class CardView : Control
 
         _countdown.AddThemeColorOverride("font_color", color);
     }
+
 
     public void PlayFlash()
     {

@@ -1,0 +1,137 @@
+[
+  {
+    "Id": 1,
+    "Encounter": [
+      101,
+      110,
+      119
+    ],
+    "Nemesis": 121
+  },
+  {
+    "Id": 2,
+    "Encounter": [
+      142,
+      154,
+      166
+    ],
+    "Nemesis": 169
+  },
+  {
+    "Id": 3,
+    "Encounter": [
+      182,
+      198,
+      214
+    ],
+    "Nemesis": 218
+  },
+  {
+    "Id": 4,
+    "Encounter": [
+      223,
+      242,
+      261
+    ],
+    "Nemesis": 266
+  },
+  {
+    "Id": 5,
+    "Encounter": [
+      263,
+      286,
+      309
+    ],
+    "Nemesis": 315
+  },
+  {
+    "Id": 6,
+    "Encounter": [
+      304,
+      330,
+      356
+    ],
+    "Nemesis": 363
+  },
+  {
+    "Id": 7,
+    "Encounter": [
+      344,
+      374,
+      404
+    ],
+    "Nemesis": 411
+  },
+  {
+    "Id": 8,
+    "Encounter": [
+      385,
+      418,
+      451
+    ],
+    "Nemesis": 460
+  },
+  {
+    "Id": 9,
+    "Encounter": [
+      425,
+      462,
+      499
+    ],
+    "Nemesis": 508
+  },
+  {
+    "Id": 10,
+    "Encounter": [
+      466,
+      506,
+      546
+    ],
+    "Nemesis": 557
+  },
+  {
+    "Id": 11,
+    "Encounter": [
+      480,
+      522,
+      564
+    ],
+    "Nemesis": 574
+  },
+  {
+    "Id": 12,
+    "Encounter": [
+      495,
+      538,
+      581
+    ],
+    "Nemesis": 592
+  },
+  {
+    "Id": 13,
+    "Encounter": [
+      510,
+      554,
+      598
+    ],
+    "Nemesis": 609
+  },
+  {
+    "Id": 14,
+    "Encounter": [
+      524,
+      570,
+      616
+    ],
+    "Nemesis": 627
+  },
+  {
+    "Id": 15,
+    "Encounter": [
+      539,
+      586,
+      633
+    ],
+    "Nemesis": 645
+  }
+]

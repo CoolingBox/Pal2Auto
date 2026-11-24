@@ -20,6 +20,12 @@ public class CharacterConfig : BaseConfig
 
     public string Desc = "";
 
-    /// <summary>这位侠客开局带的 12 张牌（CardConfig.Id）。选人即选牌组。</summary>
+    /// <summary>
+    /// 气血上限。写进配置而不是写死常量：小虎可以厚、忆如可以薄，
+    /// 而且调平衡时不改代码（以前是 BattlePanel 里硬编码 120）。
+    /// </summary>
+    public int Hp = 200;
+
+    /// <summary>开局牌组（CardConfig.Id），允许同一个 Id 出现多次。</summary>
     public int[] Deck = new int[0];
 }

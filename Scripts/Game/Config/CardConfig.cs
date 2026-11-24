@@ -124,6 +124,60 @@ public class CardConfig : BaseConfig
     public string Icon = "";   // Resources/Image/Items/{Icon}.png
     public string Desc = "";
 
+    /// <summary>
+    /// 标签（可多个，逗号分隔）。照《大巴扎》的做法：一张卡同时属于若干类别，
+    /// 商店、奇遇、偏好筛选都靠它，不靠卡名 —— 改文案不该影响概率。
+    /// 词表见 Docs/装备与技能设计.md ：家族(Palm/SaberArt/SwordArt/Formation/Spirit/Serpent/Fox/Tiger/Incantation/Ultimate)、
+    /// 类型(Blade/Armor/Charm/Pill/Talisman/Dart/Gu)、属性(Physical/Fire/Ice/Thunder/Poison/Heal/Shield/Pierce/Multi/Control/Expose)、
+    /// 节奏(Fast/Mid/Slow，由 Countdown 自动补)。
+    /// </summary>
+    public string Tags = "";
+
+    /// <summary>归属：0 通用 / 1 王小虎 / 2 沈欺霜 / 3 苏媚 / 4 李忆如。非 0 的本命卡只在该主角池里高概率出现。</summary>
+    public int Owner;
+
+    /// <summary>
+    /// 起步阶（最低能出到几阶）。铜 1 / 银 2 / 金 3 / 钻 4。
+    /// 铜阶卡可以一路合成到钻；起步金/钻的卡（绝学、顶级法宝）只能靠掉落或购买，合不出来。
+    /// 数值缩放与蓄势缩短都以它为基准，见 CardTierRules。
+    /// </summary>
+    public CardTier MinTier = CardTier.Copper;
+
+    /// <summary>
+    /// 只在开局牌组里出现，不进商店、不进遭遇奖励。
+    /// 用于「劈砍 / 招架」这类起点卡：它们的唯一作用是给出「该删什么」的动机。
+    /// </summary>
+    public bool StarterOnly;
+
+    /// <summary>能不能从铜阶一路合上来。</summary>
+    public bool CanGrowFromCopper()
+    {
+        return MinTier == CardTier.Copper;
+    }
+
+    /// <summary>
+    /// 按标签判定（不改卡名）。
+    /// 必须按逗号精确分词 —— 早期版本用 Tags.Contains(tag)，结果 "Sword" 会命中 "SwordArt"，
+    /// 沈欺霜的整套仙霞剑法因此被当成兵器混进兵器铺。
+    /// </summary>
+    public bool HasTag(string tag)
+    {
+        if (string.IsNullOrEmpty(Tags))
+        {
+            return false;
+        }
+
+        string[] parts = Tags.Split(',');
+        for (int i = 0; i < parts.Length; i++)
+        {
+            if (parts[i].Trim() == tag)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public bool HasKeyword(CardKeyword keyword)
     {
         return (Keywords & keyword) != 0;
