@@ -1,27 +1,36 @@
 shader_type canvas_item;
 
-// 角色头像框（参考炉石 / 大巴扎的牌框做法）：
-//   1. 以"高度"为单位做距离场，边框宽度在横竖两个方向一样粗（按 UV 算的话宽框左右边会变粗）
-//   2. 外框用距离场的梯度当法线做斜上方打光 —— 上边亮、下边暗，金属才有厚度
-//   3. 外缘压暗 + 内圈一道亮金细线，把"框"和"画"分开
-//   4. 画面靠近框的位置压一层内阴影，画就不会像贴纸一样浮在框上
-//   5. 顶边正中一颗宝石扣，四角一颗铆钉（带暗环，不像贴片）
-//   6. 框外一层柔和投影，让头像从背景里浮起来
+// 角色头像框 v4 —— 在 v3（老游戏硬倒角）之上补**解析抗锯齿**
+//
+// v3 用 if/else 在距离场上切档，切出来的八角边永远是台阶 —— 一个像素不是"在档内"就是"在档外"。
+// v4 不换美术，只换取值方式：所有边界都改成 ±半个像素的 smoothstep（宽度由 fwidth(d) 给出），
+// 于是切角、斜面、宝石、铆片的外轮廓在**任何分辨率**下都是平滑的，而且不花额外采样、不吃分辨率。
+//
+// 这就是"解析抗锯齿"（analytic AA）：能算出几何距离的地方，就不该靠 MSAA / FXAA 去猜。
+// 位图立绘做不到这一点（它没有距离场），只能靠提高渲染倍率或多重采样。
 
-uniform vec2 uv_scale = vec2(1.0, 1.0);
+// —— 立绘摆放（由 PortraitFrame.ApplyFit 按内容包围盒算好）——
+uniform vec2 art_size = vec2(1.0, 1.0);
+uniform vec2 art_pos = vec2(0.5, 0.5);
+uniform vec3 paper : source_color = vec3(0.062, 0.053, 0.042);
 uniform float aspect = 1.6;
 
-uniform float cut : hint_range(0.05, 0.45) = 0.30;   // 切角大小（占高度比例）
-uniform float rim : hint_range(0.02, 0.25) = 0.075;   // 外框厚度
-uniform float lip : hint_range(0.0, 0.06) = 0.016;    // 内圈亮线宽度
-uniform float inner : hint_range(0.0, 0.20) = 0.060;  // 内阴影深度
-uniform float soft : hint_range(0.0, 0.20) = 0.070;   // 外投影范围
+// —— 框形（都以框高为 1）——
+uniform float cut : hint_range(0.05, 0.45) = 0.22;    // 切角大小
+uniform float rim : hint_range(0.02, 0.25) = 0.088;   // 金属框总厚
+uniform float lip : hint_range(0.0, 0.06) = 0.018;    // 内圈暗缝宽度
+uniform float inner : hint_range(0.0, 0.20) = 0.055;  // 画面内阴影深度
+
+// 抗锯齿开关：1 = 按 1 像素过渡；0 = 硬台阶（老游戏感）。
+// 注意不能直接置 0 后拿 0 当 smoothstep 的宽度 —— edge0 == edge1 在 GLSL 里结果未定义，
+// 所以取一个极小正数当兜底。
+uniform float aa_scale : hint_range(0.0, 1.0) = 1.0;
 
 uniform vec4 frame_color : source_color = vec4(0.780, 0.620, 0.330, 1.0);
 uniform vec4 gem_color : source_color = vec4(0.560, 0.760, 0.880, 1.0);
 uniform float gem : hint_range(0.0, 1.0) = 1.0;
 
-// p: 以高度的一半为 1 的坐标；返回切角矩形的距离场（<0 在内部）
+// p：以高度的一半为 1 的坐标；返回切角矩形的距离场（<0 在内部）
 float plate_d(vec2 p, float half_w, float c) {
 	float box = max(abs(p.x) - half_w, abs(p.y) - 1.0);
 	float chamfer = (abs(p.x) + abs(p.y)) - (half_w + 1.0 - c);
@@ -29,72 +38,88 @@ float plate_d(vec2 p, float half_w, float c) {
 }
 
 void fragment() {
-	vec2 uv = clamp((UV - vec2(0.5)) * uv_scale + vec2(0.5), vec2(0.0), vec2(1.0));
-	vec4 art = texture(TEXTURE, uv);
+	// —————————————————————— 画面 ——————————————————————
+	vec2 uv = (UV - art_pos) / art_size + vec2(0.5);
+	vec3 paint = paper;
+	if (uv.x > 0.0 && uv.x < 1.0 && uv.y > 0.0 && uv.y < 1.0) {
+		vec4 t = texture(TEXTURE, uv);
+		paint = mix(paint, t.rgb, t.a);
+	}
+	// 底部略压暗，让半身像"坐"在框里；比 v2 轻 —— 老游戏不讲究景深
+	paint *= mix(0.66, 1.0, smoothstep(0.0, 0.20, 1.0 - UV.y));
 
-	// 归一化坐标：y 的上下边是 ±1，x 按比例展开
+	// —————————————————————— 框 ——————————————————————
 	float half_w = aspect;
 	vec2 p = vec2((UV.x - 0.5) * aspect, UV.y - 0.5) * 2.0;
 
-	// 参数都以"高度"为单位，×2 换成归一化单位
 	float c = cut * 2.0;
 	float r = rim * 2.0;
 	float l = lip * 2.0;
 	float sh = inner * 2.0;
-	float sf = soft * 2.0;
 
 	float d = plate_d(p, half_w, c);
-	vec4 col;
 
-	if (d > 0.0) {
-		// 外投影：越远越淡
-		float a = clamp(1.0 - d / max(sf, 1e-4), 0.0, 1.0);
-		col = vec4(0.0, 0.0, 0.0, a * a * 0.55);
-	} else if (d > -r) {
-		// 金属外框：用距离场梯度当法线，光从左上来
-		vec2 g = vec2(dFdx(d), dFdy(d));
-		vec2 n = normalize(g + vec2(1e-5));
-		float lambert = dot(n, normalize(vec2(-0.75, -1.0)));
-		float lit = clamp(0.5 + 0.5 * lambert, 0.0, 1.0);
+	// 一个像素有多宽（以距离场为单位）。所有过渡都以它为宽度 —— 抗锯齿的全部秘密就在这一行。
+	float aa = max(fwidth(d) * aa_scale, 1e-5);
+	float hw = aa * 0.5;
 
-		vec3 metal = mix(frame_color.rgb * 0.55, frame_color.rgb * 1.18, lit);
+	vec2 g = vec2(dFdx(d), dFdy(d));
+	vec2 n = normalize(g + vec2(1e-5));
+	float lit = clamp(0.5 + 0.5 * dot(n, normalize(vec2(-0.62, -1.0))), 0.0, 1.0);
 
-		// 外缘压暗收轮廓，内缘再亮一点做倒角反光
-		float edge = smoothstep(0.0, 0.10, -d / max(r, 1e-4));
-		metal *= mix(0.45, 1.0, edge);
-		float bevel = smoothstep(0.55, 0.95, -d / max(r, 1e-4));
-		metal += vec3(0.10) * bevel;
+	// —— 画面（含内阴影）——
+	float depth = clamp((-d - r - l) / max(sh, 1e-4), 0.0, 1.0);
+	vec3 colArt = paint * mix(0.66, 1.0, depth);
 
-		col = vec4(metal, 1.0);
-	} else if (d > -r - l) {
-		// 内圈亮金细线：把框和画切开
-		col = vec4(mix(vec3(1.0, 0.97, 0.88), frame_color.rgb, 0.30), 1.0);
-	} else {
-		// 画面 + 内阴影
-		float depth = clamp((-d - r - l) / max(sh, 1e-4), 0.0, 1.0);
-		col = vec4(art.rgb * mix(0.42, 1.0, depth), art.a);
+	// —— 框面五档：外沿暗线 / 外倒角 / 平色面 / 内倒角 / 内沿暗线 ——
+	// 受光侧亮、背光侧暗仍然只取两档；只是档与档之间用半个像素过渡，不再硬切。
+	float t = clamp(-d / max(r, 1e-4), 0.0, 1.0);
+	float bw = aa / max(r, 1e-4);
+
+	vec3 cBevel = (lit > 0.5) ? frame_color.rgb * 1.12 : frame_color.rgb * 0.50;
+	vec3 cFace  = (lit > 0.5) ? frame_color.rgb * 0.94 : frame_color.rgb * 0.76;
+	vec3 cInner = (lit > 0.5) ? frame_color.rgb * 1.04 : frame_color.rgb * 0.58;
+
+	vec3 colFrame = frame_color.rgb * 0.30;
+	colFrame = mix(colFrame, cBevel, smoothstep(0.15 - bw * 0.5, 0.15 + bw * 0.5, t));
+	colFrame = mix(colFrame, cFace,  smoothstep(0.33 - bw * 0.5, 0.33 + bw * 0.5, t));
+	colFrame = mix(colFrame, cInner, smoothstep(0.74 - bw * 0.5, 0.74 + bw * 0.5, t));
+	colFrame = mix(colFrame, frame_color.rgb * 0.34, smoothstep(0.90 - bw * 0.5, 0.90 + bw * 0.5, t));
+
+	// —— 由内到外拼：画面 → 内圈暗缝 → 框 ——
+	vec3 col = colArt;
+	float lipEdge = -r - l;
+	col = mix(col, frame_color.rgb * 0.38, smoothstep(lipEdge - hw, lipEdge + hw, d));
+	col = mix(col, colFrame, smoothstep(-r - hw, -r + hw, d));
+
+	// —— 外形轮廓：板内 vs 板外投影。这一层决定八角边有没有台阶 ——
+	float cover = 1.0 - smoothstep(-hw, hw, d);
+	float shadowAlpha = clamp(1.0 - d / 0.075, 0.0, 1.0) * 0.55;
+	vec4 outColor = mix(vec4(0.0, 0.0, 0.0, shadowAlpha), vec4(col, 1.0), cover);
+
+	// —————————————————————— 四角铆片 ——————————————————————
+	vec2 cq = abs(p) - vec2(half_w - c * 0.5 - 0.050, 1.0 - c * 0.5 - 0.050);
+	float sq = max(abs(cq.x), abs(cq.y));
+	if (sq < 0.072 + aa) {
+		float inCore = 1.0 - smoothstep(0.052 - hw, 0.052 + hw, sq);
+		float inRing = 1.0 - smoothstep(0.072 - hw, 0.072 + hw, sq);
+		vec3 cqCol = mix(frame_color.rgb * 0.28, frame_color.rgb * 1.05, inCore);
+		outColor = mix(outColor, vec4(cqCol, 1.0), inRing * cover);
 	}
 
-	// 四角铆钉：小菱形 + 暗环
-	vec2 cq = abs(p) - vec2(half_w - c * 0.5, 1.0 - c * 0.5);
-	float diamond = abs(cq.x) + abs(cq.y);
-	if (diamond < 0.058) {
-		col = vec4(mix(frame_color.rgb, vec3(1.0, 0.95, 0.80), 0.55), 1.0);
-	} else if (diamond < 0.084) {
-		col = vec4(frame_color.rgb * 0.30, 1.0);
-	}
-
-	// 顶边正中的宝石扣
+	// —————————————————————— 顶冠宝石 ——————————————————————
 	if (gem > 0.5) {
-		vec2 gp = p - vec2(0.0, -1.0 + r * 0.5);
-		float gd = abs(gp.x) + abs(gp.y) * 1.15;
-		if (gd < 0.088) {
-			float core = clamp(1.0 - gd / 0.088, 0.0, 1.0);
-			col = vec4(mix(gem_color.rgb * 0.55, gem_color.rgb * 1.35, core), 1.0);
-		} else if (gd < 0.125) {
-			col = vec4(frame_color.rgb * 0.25, 1.0);
+		vec2 gp = p - vec2(0.0, -1.0 + r * 0.55);
+		float gd = abs(gp.x) * 1.15 + abs(gp.y);
+		if (gd < 0.078 + aa) {
+			float core = 1.0 - smoothstep(0.050 - hw, 0.050 + hw, gd);
+			float seat = 1.0 - smoothstep(0.078 - hw, 0.078 + hw, gd);
+			vec3 gemCol = mix(gem_color.rgb * 0.42, gem_color.rgb * 0.78,
+				clamp(1.0 - gd / 0.050, 0.0, 1.0));
+			vec3 g3 = mix(frame_color.rgb * 0.24, gemCol, core);
+			outColor = mix(outColor, vec4(g3, 1.0), seat);
 		}
 	}
 
-	COLOR = col;
+	COLOR = outColor;
 }

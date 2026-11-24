@@ -1,14 +1,27 @@
 // 文件：PortraitFrame.cs
 // 描述：战斗里的角色头像框。切角矩形 + 带打光的金属边 + 内圈亮线 + 四角铆钉 + 顶边宝石扣
 //       （形状与材质都在 portrait_frame.gdshader 里）。
-//       立绘走"铺满裁切"，因为仙剑2 的立绘比例有 1.28 / 1.0 / 0.8 三种，直接塞进固定框会拉变形。
+//       立绘排版按"内容包围盒"算，不按整张贴图：
+//         1. 先取不透明像素的包围盒，把四周透明留白去掉，不然小头像会被留白顶到边角
+//         2. 整张立绘塞进框内可见区（外框 + 内圈亮线之内），上沿对齐并留一条缝 —— 头不能被内框切掉
+//         3. 立绘比框高的时候只从下摆裁（胸以下压到框边下面），宽度尽量撑满
 
 using Godot;
 
 public partial class PortraitFrame : Control
 {
+    // 立绘最多裁掉多少：0.63 = 至少露出内容高度的 63%（头 + 一点脖子），剩下的用来把宽度撑满。
+    // 仙剑2 的立绘都是半身，头大约占上面一半，低于 0.55 就会切到下巴。
+    private const float MinVisibleHeight = 0.63f;
+
+    // 内容上沿与内框之间的缝（占可见区高度）。太小头会贴着内框，像被裁掉。
+    private const float TopGap = 0.075f;
+
     private TextureRect _art;
     private ShaderMaterial _material;
+    private Texture2D _texture;
+    private float _rim = 0.082f;
+    private float _lip = 0.016f;
     private bool _built;
 
     public override void _Ready()
@@ -46,11 +59,11 @@ public partial class PortraitFrame : Control
     {
         EnsureBuilt();
 
-        Texture2D texture = UiKit.LoadTexture("res://Resources/Image/Portrait/" + key + ".png");
-        _art.Texture = texture;
+        _texture = UiKit.LoadTexture("res://Resources/Image/Portrait/" + key + ".png");
+        _art.Texture = _texture;
         _art.Size = Size;
         ApplyAspect();
-        ApplyCoverScale(texture);
+        ApplyFit();
     }
 
     /// <summary>边框色。敌我用不同的金，扫一眼就知道谁是谁。</summary>
@@ -64,9 +77,19 @@ public partial class PortraitFrame : Control
     public void SetShape(float cut, float rim)
     {
         EnsureBuilt();
+        _rim = rim;
+        _lip = rim * 0.2f;
         _material.SetShaderParameter("cut", cut);
         _material.SetShaderParameter("rim", rim);
-        _material.SetShaderParameter("lip", rim * 0.2f);
+        _material.SetShaderParameter("lip", _lip);
+        ApplyFit();
+    }
+
+    /// <summary>解析抗锯齿开关。关掉就是硬台阶 —— 切角、宝石、铆片的边缘不再做 1 像素过渡。</summary>
+    public void SetAntiAlias(bool enabled)
+    {
+        EnsureBuilt();
+        _material.SetShaderParameter("aa_scale", enabled ? 1.0f : 0.0f);
     }
 
     public void SetGem(Color color, bool visible)
@@ -87,29 +110,91 @@ public partial class PortraitFrame : Control
     }
 
     /// <summary>
-    /// 按"铺满裁切"算 UV 缩放：贴图比框更长的那一边多出来，从中间裁掉。
-    /// 传 1.0 的一边不动，另一边缩到可见比例。
+    /// 算立绘在框内的摆放：art_size 是整张贴图的显示尺寸，art_pos 是立绘中心落在框里的位置
+    /// （两者都以框的宽高为 1）。着色器拿这两个值把贴图映射进来。
     /// </summary>
-    private void ApplyCoverScale(Texture2D texture)
+    private void ApplyFit()
     {
-        if (texture == null || Size.X <= 0f || Size.Y <= 0f)
+        if (_material == null || _texture == null)
+        {
+            return;
+        }
+        if (Size.X <= 0f || Size.Y <= 0f)
         {
             return;
         }
 
-        float textureAspect = (float)texture.GetWidth() / texture.GetHeight();
-        float rectAspect = Size.X / Size.Y;
-
-        Vector2 scale;
-        if (textureAspect > rectAspect)
+        float texW = _texture.GetWidth();
+        float texH = _texture.GetHeight();
+        if (texW <= 0f || texH <= 0f)
         {
-            scale = new Vector2(rectAspect / textureAspect, 1f);
+            return;
+        }
+
+        // 不透明内容在贴图里的范围（uv）。取不到就当成满幅。
+        float usedX = 0f;
+        float usedY = 0f;
+        float usedW = 1f;
+        float usedH = 1f;
+        Rect2I used = GetUsedRect(_texture);
+        if (used.Size.X > 0 && used.Size.Y > 0)
+        {
+            usedX = used.Position.X / texW;
+            usedY = used.Position.Y / texH;
+            usedW = used.Size.X / texW;
+            usedH = used.Size.Y / texH;
+        }
+
+        // 框里真正能看见画的区域：外框和内圈亮线以内。
+        float inset = (_rim + _lip) * Size.Y;
+        float innerW = Size.X - inset * 2.0f;
+        float innerH = Size.Y - inset * 2.0f;
+        if (innerW < 8.0f || innerH < 8.0f)
+        {
+            return;
+        }
+
+        float contentW = usedW * texW;
+        float contentH = usedH * texH;
+
+        // 两个约束取小的那个：撑满宽度，或者最多裁掉下摆（露出 MinVisibleHeight）。
+        float scaleByWidth = innerW / contentW;
+        float scaleByHeight = innerH / (contentH * MinVisibleHeight);
+        float scale = Mathf.Min(scaleByWidth, scaleByHeight);
+
+        float drawW = contentW * scale;
+        float drawH = contentH * scale;
+
+        // 比可见区矮就居中，比可见区高就上沿对齐 —— 头永远在内框下面露出来。
+        float topGap = innerH * TopGap;
+        float centerY;
+        if (drawH <= innerH)
+        {
+            centerY = inset + innerH * 0.5f;
         }
         else
         {
-            scale = new Vector2(1f, textureAspect / rectAspect);
+            centerY = inset + topGap + drawH * 0.5f;
         }
 
-        _material.SetShaderParameter("uv_scale", scale);
+        Vector2 artSize = new Vector2(drawW / (Size.X * usedW), drawH / (Size.Y * usedH));
+        Vector2 contentCenter = new Vector2(usedX + usedW * 0.5f, usedY + usedH * 0.5f);
+        Vector2 artPos = Vector2.Zero;
+        artPos.X = 0.5f - (contentCenter.X - 0.5f) * artSize.X;
+        artPos.Y = (centerY / Size.Y) - (contentCenter.Y - 0.5f) * artSize.Y;
+
+        _material.SetShaderParameter("art_size", artSize);
+        _material.SetShaderParameter("art_pos", artPos);
+    }
+
+    /// <summary>贴图里不透明像素的包围盒（像素坐标）。整张都透明就返回空。</summary>
+    private static Rect2I GetUsedRect(Texture2D texture)
+    {
+        Image image = texture.GetImage();
+        if (image == null)
+        {
+            return new Rect2I();
+        }
+        return image.GetUsedRect();
     }
 }

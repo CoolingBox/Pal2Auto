@@ -59,7 +59,7 @@ public static class UiKit
         label.AddThemeFontOverride("font", GameFont);
         label.AddThemeFontSizeOverride("font_size", size);
         label.AddThemeColorOverride("font_color", color);
-        label.AddThemeColorOverride("font_shadow_color", new Color(0f, 0f, 0f, 0.45f));
+        label.AddThemeColorOverride("font_shadow_color", new Color(0f, 0f, 0f, 0.80f));
         label.AddThemeConstantOverride("shadow_offset_x", 1);
         label.AddThemeConstantOverride("shadow_offset_y", 1);
         label.MouseFilter = Control.MouseFilterEnum.Ignore;
