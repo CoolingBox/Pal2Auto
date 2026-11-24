@@ -689,15 +689,9 @@ public sealed class RunState
     {
         Notes.Add("阅历升到 " + Level + " 级");
 
-        // 上场数只在 2/4/6 级 +1，正好摸到 DeckBattle.HandMax = 8，不改内核。
-        if (Level == 2 || Level == 4 || Level == 6)
-        {
-            if (HandCapacity < MaxHandCapacity)
-            {
-                HandCapacity++;
-                Notes.Add("上场数 +1 → " + HandCapacity);
-            }
-        }
+        // 2026-11-24：等级不再给上场数。卡槽是「稀有资源」，
+        // 只能靠器物牌（捆仙索 / 七星灯 / 如意玄武遗 的 HandSelf +1）在局内争取。
+        // 所以这里只给气血与三选一。
 
         // 气血是每次升级的固定收益，三选一是额外的。
         Notes.Add("气血上限 → " + MaxHp);
@@ -853,7 +847,7 @@ public sealed class RunState
                 continue;
             }
             any.Add(card.Id);
-            if (card.Owner == CharacterId)
+            if (card.Master == CharacterId)
             {
                 own.Add(card.Id);
             }

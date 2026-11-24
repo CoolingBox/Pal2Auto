@@ -83,7 +83,7 @@ def main():
 
     groups = {0: [], 1: [], 2: [], 3: [], 4: []}
     for c in cards:
-        groups.setdefault(c.get("Owner", 0), []).append(c)
+        groups.setdefault(c.get("Master", 0), []).append(c)
 
     starters = [c for c in cards if c.get("StarterOnly")]
     counts = {t: 0 for t in TIER_NAME}
@@ -139,7 +139,7 @@ def main():
                 c["Countdown"], effect_line(c, mt), c.get("Keywords", "—"), c.get("Tags", "—")))
         lines.append("")
 
-    open(OUT, "w", encoding="utf-8").write("\n".join(lines))
+    open(OUT, "w", encoding="utf-8", newline="\n").write("\n".join(lines))
     print("已导出 %s，共 %d 张（含起始卡 %d 张）" % (OUT, len(cards), len(starters)))
     return 0
 

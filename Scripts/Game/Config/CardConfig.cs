@@ -133,8 +133,15 @@ public class CardConfig : BaseConfig
     /// </summary>
     public string Tags = "";
 
-    /// <summary>归属：0 通用 / 1 王小虎 / 2 沈欺霜 / 3 苏媚 / 4 李忆如。非 0 的本命卡只在该主角池里高概率出现。</summary>
-    public int Owner;
+    /// <summary>
+    /// 武学归属：0 通用 / 1 王小虎 / 2 沈欺霜 / 3 苏媚 / 4 李忆如。非 0 的本命卡只在该主角池里高概率出现。
+    ///
+    /// 这个字段叫 Master 而不是 Owner，是为了跟战斗侧分开：`DeckBattle` 里的 `owner` 参数
+    /// 指的是「此刻由哪一方出这张牌」（运行时持有方，另有 `BattleEvent.Side`），
+    /// 而这里是「这门武学是谁的」（静态设计归属）。两者没有关系，同一张卡可以
+    /// Master = 1（小虎的本命）却由敌人打出。
+    /// </summary>
+    public int Master;
 
     /// <summary>
     /// 起步阶（最低能出到几阶）。铜 1 / 银 2 / 金 3 / 钻 4。

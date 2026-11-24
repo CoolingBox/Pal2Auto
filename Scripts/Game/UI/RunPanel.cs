@@ -6,7 +6,7 @@
 //   顶栏：第 N 天 · 第 M 时辰 ／ 六个时辰进度 ／ 银两 · 声望 · 胜场
 //   主体：按当前时辰类型切换
 //         Free        → 集市 / 奇遇 / 淬炉 三选一
-//         Shop        → 三格货架（按阶定价）+ 刷新 + 离开
+//         Shop        → 四格货架（按阶定价）+ 刷新 + 离开
 //         Encounter   → 敌人信息 + 开战
 //         Nemesis     → 同上，但输了扣声望
 //         Event/Forge → 尚未实装，只能离开（不假装做了）
@@ -447,10 +447,19 @@ public class RunPanel : BasePanel
         RunCard card = offer.Card;
         Color accent = TierColor(card.Tier);
 
-        float x = 156f + index * 224f;
+        // 货格按实际数量居中：3 格与 4 格都能用，不写死坐标。
+        int count = shop.Offers.Count;
+        if (count < 1)
+        {
+            count = 1;
+        }
+        float cardW = 200f;
+        float gap = 24f;
+        float total = count * cardW + (count - 1) * gap;
+        float x = (W - total) * 0.5f + index * (cardW + gap);
         Panel frame = new Panel();
         frame.Position = new Vector2(x, 54f);
-        frame.Size = new Vector2(200f, 208f);
+        frame.Size = new Vector2(cardW, 208f);
         frame.AddThemeStyleboxOverride("panel",
             UiKit.Box(new Color(0.100f, 0.088f, 0.070f), accent, 1, 3));
         _body.AddChild(frame);

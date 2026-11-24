@@ -77,11 +77,11 @@ public static class AffinityRules
         }
 
         // 本命卡永远算偏好；别派本命算回避 —— 否则小虎会抽到一池子沈欺霜的剑法。
-        if (card.Owner == characterId && characterId != 0)
+        if (card.Master == characterId && characterId != 0)
         {
             return Affinity.Preferred;
         }
-        if (card.Owner != 0 && card.Owner != characterId)
+        if (card.Master != 0 && card.Master != characterId)
         {
             return Affinity.Avoided;
         }

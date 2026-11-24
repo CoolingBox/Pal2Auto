@@ -204,9 +204,10 @@ public static class CardPool
         switch (kind)
         {
             case ShopKind.Blade:
-                return new string[] { "Blade", "Sword", "Whip", "Spear" };
+                // 伞（Fan）是兵器，2026-11-25 从防具铺挪过来
+                return new string[] { "Blade", "Sword", "Whip", "Spear", "Fan" };
             case ShopKind.Armor:
-                return new string[] { "Armor", "Fan" };
+                return new string[] { "Armor" };
             case ShopKind.Pill:
                 return new string[] { "Pill" };
             case ShopKind.Talisman:
@@ -239,7 +240,7 @@ public static class CardPool
         if (kind == ShopKind.General)
         {
             // 杂货摊只排除别派本命卡：那类卡买来对当前主角没用
-            return card.Owner == 0 || card.Owner == characterId;
+            return card.Master == 0 || card.Master == characterId;
         }
 
         string[] tags = KindTags(kind);
@@ -263,7 +264,7 @@ public static class CardPool
         }
 
         // 武学馆之外也要挡住别派本命卡（比如别派的剑法不该出现在杂货摊）
-        if (card.Owner != 0 && card.Owner != characterId)
+        if (card.Master != 0 && card.Master != characterId)
         {
             return false;
         }

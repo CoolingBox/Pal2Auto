@@ -1,8 +1,8 @@
 // 文件：ShopStock.cs
-// 描述：集市 —— 一家店，3 格货架，按阶定价，刷新费逐次翻倍。
+// 描述：集市 —— 一家店，4 格货架，按阶定价，刷新费逐次翻倍。
 //
 // 2026-11-24 改成「分店制」：
-//   每次进集市时辰，开一家随机店（品类 × 档次），3 格全部来自这家店的池子。
+//   每次进集市时辰，开一家随机店（品类 × 档次），4 格全部来自这家店的池子。
 //   品类决定「卖什么」（兵器铺 / 防具铺 / 药铺 / 符咒铺 / 蛊铺 / 器物阁 / 暗器铺 / 武学馆 / 杂货摊），
 //   档次决定「卖多好的」（寻常：铜银 ／ 上等：银金 ／ 珍稀：金钻）。
 //   刷新 = 同店重新进货，不换店 —— 换店会让「店」这个概念失去意义。
@@ -47,7 +47,8 @@ public sealed class ShopOffer
 
 public sealed class ShopStock
 {
-    public const int SlotCount = 3;
+    /// <summary>货架格数。2026-11-25 从 3 提到 4：卡池涨到 278 之后，3 格太难凑齐同名卡做 2 合 1。</summary>
+    public const int SlotCount = 4;
 
     public ShopKind Kind = ShopKind.General;
     public ShopGrade Grade = ShopGrade.Common;
