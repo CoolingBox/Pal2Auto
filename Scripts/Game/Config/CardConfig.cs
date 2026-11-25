@@ -118,6 +118,13 @@ public class CardConfig : BaseConfig
     /// <summary>多重：这张牌每次使用结算几次。</summary>
     public int MultiCount;
 
+    /// <summary>
+    /// 打出后往**双方抽牌堆**各塞一张这张卡的 Id（0 = 不塞）。
+    /// 只在本场战斗内生效，不改玩家牌组 —— 野球拳用的就是这个：
+    /// 一人一拳，两边牌组都变厚，谁抽到谁再打一拳。
+    /// </summary>
+    public int SpawnCardId;
+
     /// <summary>关键字（可多个）。JSON 里写 "Exhaust" 或 "Exhaust, Remove"。</summary>
     public CardKeyword Keywords = CardKeyword.None;
 

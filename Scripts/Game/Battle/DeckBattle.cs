@@ -218,10 +218,64 @@ public sealed class DeckBattle
     /// 是全局最强的滚雪球，苏媚靠一张 82 灵蛇出洞就能把第 1~2 天打到 100%。
     /// </summary>
     public const float PoisonPerStackPerSecond = 0.5f;
-    public const float TimeLimit = 60f;
+    // —————————————— 沙尘暴（衰歇期）——————————————
+    //
+    // 参考《The Bazaar》：战斗拖到一定时间后，双方一起掉血，逼「只堆护体 / 治疗不出输出」的构筑没法靠磨赢。
+    // 2026-11-25 用户定：**1 秒 4 跳、每跳伤害 +1**，风暴一旦开始就快速收尾。
+    //   60 秒起（TimeLimit 90 的三分之二），正常战斗 20~35 秒结束，碰不到；
+    //   0.25 秒一跳 → 第 1 秒掉 1+2+3+4 = 10，第 5 秒累计 210，第 10 秒累计 820；
+    //   任何血量（260~554）都撑不过 10 秒，护体 40 也只是多挡两跳。
+    public const float SandstormStart = 60f;
+    public const float SandstormInterval = 0.25f;
+    public const int SandstormBase = 1;
+    public const int SandstormStep = 1;
+
+    /// <summary>沙尘暴已经跳了几次（0 = 还没开始）。</summary>
+    public int SandstormTicks;
+
+    private float _sandstormTimer;
+
+    /// <summary>下一次沙尘暴伤害（界面上显示"下一跳 N"用）。</summary>
+    public int SandstormNextDamage
+    {
+        get
+        {
+            return SandstormBase + SandstormStep * SandstormTicks;
+        }
+    }
+
+    /// <summary>沙尘暴是否已经开始。</summary>
+    public bool SandstormActive
+    {
+        get
+        {
+            return Elapsed >= SandstormStart;
+        }
+    }
+
+    /// <summary>
+    /// 一场最多打多久。2026-11-25 冷却统一成整秒（3~8）之后从 60 提到 90：
+    /// 单次蓄势变长、出手次数变少，60 秒窗口会把慢卡直接判死（实测 D1 中档从 90% 掉到 29%）。
+    /// </summary>
+    public const float TimeLimit = 180f;
+
+    /// <summary>
+    /// 「同时出手」的判定窗口：一方倒下后不立刻结算，继续观察这么久。
+    /// 0.1 秒 = 1 秒 10 次判定 —— 这期间对手如果也被毒 / 沙尘暴带走，算双方同时出手，判玩家赢。
+    /// </summary>
+    public const float SimultaneousWindow = 0.1f;
+
+    /// <summary>本场第一个倒下的时间（-1 = 还没人倒）。</summary>
+    public float FirstDeathAt = -1f;
 
     /// <summary>护体上限。不封顶的话守牌会把伤害全吃掉，双方都打不死。</summary>
-    public const int ShieldCap = 20;
+    /// <summary>
+    /// 护体**不设上限**（2026-11-25 改）。原来这里是 40，理由是「护体不衰减，无限叠会无敌」——
+    /// 但这个理由站不住：参考《The Bazaar》，护盾本来就没有上限（单件磁力护盾就给 100~200 盾），
+    /// 它靠的是**沙尘暴**兜底：风暴伤害每跳 +1、1 秒 4 跳，最终一定压过任何护盾。
+    /// 上限的存在反而掐死了守赢流 —— 5 槽护体流每 3 秒能加 60 盾，上限 40 意味着三分之二白给。
+    /// </summary>
+    public const int ShieldCap = 9999;
 
     /// <summary>毒层上限。不封顶的话长战斗会变成「毒一发，敌人自己死」。</summary>
     public const int PoisonMaxStacks = 20;
@@ -415,9 +469,57 @@ public sealed class DeckBattle
         TickHandMods(dt);
         TickFighter(Player, Enemy, dt, events);
         TickFighter(Enemy, Player, dt, events);
+        TickSandstorm(dt, events);
 
         CheckEnd(events);
         return events;
+    }
+
+    /// <summary>
+    /// 沙尘暴：TimeLimit 到点前先替玩家结束战斗。伤害无视护体（护体是「挡刀」的，挡不了天气）。
+    /// </summary>
+    private void TickSandstorm(float dt, List<BattleEvent> events)
+    {
+        if (Elapsed < SandstormStart)
+        {
+            return;
+        }
+
+        _sandstormTimer += dt;
+        while (_sandstormTimer >= SandstormInterval)
+        {
+            _sandstormTimer -= SandstormInterval;
+
+            int damage = SandstormBase + SandstormStep * SandstormTicks;
+            SandstormTicks++;
+
+            ApplySandstormHit(Player, damage, events);
+            ApplySandstormHit(Enemy, damage, events);
+        }
+    }
+
+    private void ApplySandstormHit(FighterState victim, int damage, List<BattleEvent> events)
+    {
+        if (victim.Dead)
+        {
+            return;
+        }
+
+        // 走正常伤害流程：**护体可以挡**。守赢流（只堆护体、不出输出）就靠这个活到对方先倒 ——
+        // 参考《The Bazaar》：「你输出不高，但比对手多扛几下，等风暴起来对方先死」。
+        // 递增的意义在于「护体迟早追不上」：第 23 跳 96 点 / 1.5 秒 ≈ 64 dps，
+        // 任何护体回复速度（4~6/秒）都挡不住，所以它只是延命，不是无敌。
+        int absorbed;
+        int dealt = ApplyDamage(victim, damage, false, out absorbed);
+        victim.Stats.DamageTaken += dealt;
+
+        BattleEvent ev = new BattleEvent();
+        ev.Kind = BattleEventKind.Damage;
+        ev.Side = SideOf(victim);
+        ev.Value = dealt;
+        ev.Absorbed = absorbed;
+        ev.Text = "沙尘暴 " + damage + "（第 " + SandstormTicks + " 阵）";
+        events.Add(ev);
     }
 
     private void TickFighter(FighterState owner, FighterState foe, float dt, List<BattleEvent> events)
@@ -718,6 +820,12 @@ public sealed class DeckBattle
     {
         ApplyTimingEffects(owner, foe, card, slot, events);
 
+        // 野球拳式：往后两边牌组各塞一张。只动本场的抽牌堆，不动玩家真正的牌组。
+        if (card.SpawnCardId > 0)
+        {
+            SpawnIntoBothDecks(owner, foe, card.SpawnCardId, slot, events);
+        }
+
         if (card.Damage > 0)
         {
             int absorbed;
@@ -737,7 +845,8 @@ public sealed class DeckBattle
         {
             // 记"实际拿到的护体"：已经顶到上限时，写 +0 比写 +8 诚实
             int shieldBefore = owner.Shield;
-            owner.Shield = Math.Min(ShieldCap, owner.Shield + card.Shield);
+            // 不封顶：护体可以一直叠，直到沙尘暴把它打穿
+            owner.Shield += card.Shield;
             int gained = owner.Shield - shieldBefore;
             owner.Stats.ShieldGained += gained;
 
@@ -866,6 +975,32 @@ public sealed class DeckBattle
                 events, BattleEventKind.Charge, 0f,
                 delegate (HandSlot target) { target.Countdown = Mathf.Max(0f, target.Countdown - 1f); });
         }
+    }
+
+    /// <summary>把一张卡塞进双方的抽牌堆（本场有效）。</summary>
+    private void SpawnIntoBothDecks(FighterState owner, FighterState foe, int cardId, int slot,
+        List<BattleEvent> events)
+    {
+        CardConfig spawn = ConfigManager.GetOne<CardConfig>(cardId);
+        if (spawn == null)
+        {
+            return;
+        }
+
+        owner.DrawPile.Add(spawn);
+        foe.DrawPile.Add(spawn);
+
+        // 两边各重洗一次，别让塞进去的牌永远排在队尾（那等于塞了个寂寞）
+        Shuffle(owner.DrawPile, new Random());
+        Shuffle(foe.DrawPile, new Random());
+
+        BattleEvent ev = new BattleEvent();
+        ev.Kind = BattleEventKind.Poison;
+        ev.Side = SideOf(owner);
+        ev.Slot = slot;
+        ev.Value = 1;
+        ev.Text = "双方牌组各入一张「" + spawn.Name + "」";
+        events.Add(ev);
     }
 
     /// <summary>按范围把同一个效果派给两边，各自发事件（记录里能看出是谁中了）。</summary>
@@ -1079,12 +1214,30 @@ public sealed class DeckBattle
             return;
         }
 
+        // 有人倒了：先记时间，再给对手 0.1 秒的「同时出手」窗口
+        if ((playerDead || enemyDead) && FirstDeathAt < 0f)
+        {
+            FirstDeathAt = Elapsed;
+        }
+        if (!(playerDead && enemyDead) && FirstDeathAt >= 0f
+            && Elapsed < FirstDeathAt + SimultaneousWindow)
+        {
+            return;
+        }
+
         Finished = true;
         TimedOut = !playerDead && !enemyDead;
 
+        // 平局一律判玩家赢（2026-11-25 用户定，不限于沙尘暴）：两种情况算平
+        //   ① 时间到、双方都还活着且残血比例相同 → 让玩家过
+        //   ② 双方同时倒下（毒 / 沙尘暴同时结算）→ 也算玩家赢
         if (TimedOut)
         {
-            PlayerWon = Player.HpRatio > Enemy.HpRatio;
+            PlayerWon = Player.HpRatio >= Enemy.HpRatio;
+        }
+        else if (enemyDead && playerDead)
+        {
+            PlayerWon = true;
         }
         else
         {

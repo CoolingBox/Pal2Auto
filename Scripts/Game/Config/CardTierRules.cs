@@ -30,7 +30,7 @@ public static class CardTierRules
     // —— 升阶系数 ——
     // 主规则：每阶 ×1.6（即「加 0.6 倍」，落在用户要求的 0.5~1 倍区间中段）。
     public const float NumericGrowth = 1.6f;
-    // 快卡的例外：CD ≤2.2 秒的卡，同样的乘数会让它的 dps 涨得比慢卡猛三倍
+    // 快卡的例外：CD ≤3 秒的卡，同样的乘数会让它的 dps 涨得比慢卡猛三倍
     // （铜大刀 4.4 dps → 钻大刀 18.3 dps，而同阶绝学只有 6.7 dps）。
     // 所以快卡压到 ×1.35，中速 ×1.45，慢卡才是 ×1.60。
     public const float FastGrowth = 1.35f;
@@ -169,11 +169,11 @@ public static class CardTierRules
         }
 
         float growth = NumericGrowth;
-        if (card.Countdown <= 2.2f)
+        if (card.Countdown <= 3.0f)
         {
             growth = FastGrowth;
         }
-        else if (card.Countdown <= 2.8f)
+        else if (card.Countdown <= 5.0f)
         {
             growth = MidGrowth;
         }

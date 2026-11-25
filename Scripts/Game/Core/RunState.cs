@@ -835,6 +835,77 @@ public sealed class RunState
         }
     }
 
+    // —————————————————————— 改单张牌（事件 / 奇遇用）——————————————————————
+
+    /// <summary>
+    /// 给牌组里的某一张牌加永久修正。**不动 CardConfig** ——
+    /// 那是全局配置，改一张等于改所有同名卡，而且跟着存档走不了。
+    /// </summary>
+    public void BuffCard(RunCard card, CardStat stat, int amount)
+    {
+        if (card == null || amount == 0)
+        {
+            return;
+        }
+
+        if (stat == CardStat.Damage)
+        {
+            card.BonusDamage += amount;
+        }
+        else if (stat == CardStat.Shield)
+        {
+            card.BonusShield += amount;
+        }
+        else if (stat == CardStat.Heal)
+        {
+            card.BonusHeal += amount;
+        }
+        else if (stat == CardStat.Poison)
+        {
+            card.BonusPoison += amount;
+        }
+        else if (stat == CardStat.Expose)
+        {
+            card.BonusExpose += amount;
+        }
+
+        card.BuffCount++;
+        Notes.Add("「" + card.CardName + "」" + StatName(stat) + " " + amount.ToString("+0;-0"));
+    }
+
+    /// <summary>改蓄势（秒，负数更快）。</summary>
+    public void BuffCardCountdown(RunCard card, float seconds)
+    {
+        if (card == null || seconds == 0f)
+        {
+            return;
+        }
+        card.BonusCountdown += seconds;
+        card.BuffCount++;
+        Notes.Add("「" + card.CardName + "」蓄势 " + seconds.ToString("+0.0;-0.0") + " 秒");
+    }
+
+    private static string StatName(CardStat stat)
+    {
+        if (stat == CardStat.Damage)
+        {
+            return "伤害";
+        }
+        if (stat == CardStat.Shield)
+        {
+            return "护体";
+        }
+        if (stat == CardStat.Heal)
+        {
+            return "治疗";
+        }
+        if (stat == CardStat.Poison)
+        {
+            return "中毒";
+        }
+        return "破绽";
+    }
+
     // —————————————————————— 升级奖励 ——————————————————————
 
     /// <summary>抽 count 个互不重复的奖励候选。</summary>

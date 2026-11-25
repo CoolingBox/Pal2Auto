@@ -240,9 +240,23 @@ public static class DevShot
             DeckBattle battle = DeckBattle.CreateWithCards(character.Name, character.Portrait, playerHp,
                 new List<CardConfig>(battleCards), enemy.Name, enemy.Portrait, enemyHp, enemy.Deck, playerSlots);
 
+            // --simstorm=1 打印沙尘暴的头几跳，验证「起始 1 伤、每跳 +1」
+            bool traceStorm = ReadIntArg("--simstorm=", 0) > 0;
+            int stormPrinted = 0;
             while (!battle.Finished)
             {
-                battle.Step(0.05f);
+                List<BattleEvent> stepEvents = battle.Step(0.05f);
+                if (traceStorm && stormPrinted < 5)
+                {
+                    for (int e = 0; e < stepEvents.Count; e++)
+                    {
+                        if (stepEvents[e].Text != null && stepEvents[e].Text.StartsWith("沙尘暴"))
+                        {
+                            GD.Print("STORM " + stepEvents[e].Text + " / 实扣 " + stepEvents[e].Value);
+                            stormPrinted++;
+                        }
+                    }
+                }
             }
 
             if (battle.PlayerWon)
@@ -287,6 +301,19 @@ public static class DevShot
 
         RunManager run = RunManager.Instance;
         run.StartRun(GameFlow.SelectedCharacterId, 0);
+
+        // --buff=N 给牌组每张牌永久 +N 伤害（验「事件改单卡」是否真的进了战斗）
+        int buffDamage = ReadIntArg("--buff=", 0);
+        if (buffDamage != 0)
+        {
+            for (int i = 0; i < run.Current.Deck.Count; i++)
+            {
+                RunCard card = run.Current.Deck[i];
+                int before = card.Damage;
+                run.Current.BuffCard(card, CardStat.Damage, buffDamage);
+                GD.Print("BUFF " + card.CardName + " 伤害 " + before + " → " + card.Damage);
+            }
+        }
 
         // --day=N 直接跳到第 N 天（验后期敌血曲线 / 界面对不对）
         int dayOverride = ReadIntArg("--day=", 0);

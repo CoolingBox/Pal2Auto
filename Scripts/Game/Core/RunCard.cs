@@ -25,6 +25,22 @@ public sealed class RunCard
     public CardTier Tier = CardTier.Copper;
     public EnchantType Enchant = EnchantType.None;
 
+    // —— 实例修正 ——
+    // 事件（奇遇、奖励、诅咒）可以直接改「这一张牌」，不能去改 CardConfig
+    // —— 那是全局配置，改一张等于改了所有同名卡，而且跟着存档走不了。
+    // 最终数值 = 配置值 × 阶位缩放 + 附魔 + 这里的修正。
+    public int BonusDamage;
+    public int BonusShield;
+    public int BonusHeal;
+    public int BonusPoison;
+    public int BonusExpose;
+
+    /// <summary>蓄势修正（秒）。负数 = 更快，结果会被 Clamp 到 MinCountdown。</summary>
+    public float BonusCountdown;
+
+    /// <summary>这张卡被事件改过几次，界面用来标一个记号。</summary>
+    public int BuffCount;
+
     public RunCard()
     {
     }
@@ -98,7 +114,8 @@ public sealed class RunCard
             {
                 return 0;
             }
-            return ApplySharp(CardTierRules.ScaledValue(cfg, cfg.Damage, Tier));
+            int value = ApplySharp(CardTierRules.ScaledValue(cfg, cfg.Damage, Tier));
+            return System.Math.Max(0, value + BonusDamage);
         }
     }
 
@@ -111,7 +128,8 @@ public sealed class RunCard
             {
                 return 0;
             }
-            return ApplySharp(CardTierRules.ScaledValue(cfg, cfg.Spell, Tier));
+            int value = ApplySharp(CardTierRules.ScaledValue(cfg, cfg.Spell, Tier));
+            return System.Math.Max(0, value + BonusDamage);
         }
     }
 
@@ -129,7 +147,7 @@ public sealed class RunCard
             {
                 value += 2;
             }
-            return value;
+            return System.Math.Max(0, value + BonusShield);
         }
     }
 
@@ -142,7 +160,8 @@ public sealed class RunCard
             {
                 return 0;
             }
-            return CardTierRules.ScaledValue(cfg, cfg.Heal, Tier);
+            int value = CardTierRules.ScaledValue(cfg, cfg.Heal, Tier);
+            return System.Math.Max(0, value + BonusHeal);
         }
     }
 
@@ -160,7 +179,7 @@ public sealed class RunCard
             {
                 value += 1;
             }
-            return value;
+            return System.Math.Max(0, value + BonusPoison);
         }
     }
 
@@ -179,6 +198,7 @@ public sealed class RunCard
             {
                 value *= 0.85f;
             }
+            value += BonusCountdown;
             if (value < CardTierRules.MinCountdown)
             {
                 value = CardTierRules.MinCountdown;
@@ -212,6 +232,13 @@ public sealed class RunCard
         copy.CardId = CardId;
         copy.Tier = Tier;
         copy.Enchant = Enchant;
+        copy.BonusDamage = BonusDamage;
+        copy.BonusShield = BonusShield;
+        copy.BonusHeal = BonusHeal;
+        copy.BonusPoison = BonusPoison;
+        copy.BonusExpose = BonusExpose;
+        copy.BonusCountdown = BonusCountdown;
+        copy.BuffCount = BuffCount;
         return copy;
     }
 
@@ -255,7 +282,7 @@ public sealed class RunCard
         copy.Poison = Poison;
 
         // 机制类不随阶位涨（见 Docs/卡牌等阶与商店.md），原样抄
-        copy.Expose = cfg.Expose;
+        copy.Expose = System.Math.Max(0, cfg.Expose + BonusExpose);
         copy.IgnoreShield = cfg.IgnoreShield;
         copy.HandSelf = cfg.HandSelf;
         copy.HandFoe = cfg.HandFoe;

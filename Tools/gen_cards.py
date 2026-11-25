@@ -548,6 +548,8 @@ NEW = [
      "Gu,Poison", "item_poison", "花是青铜色的，香气也是毒。"),
     (282, "雪蛤蟆", 0, "Guard", 2.8, {"Shield": 12}, "",
      "Gu,Shield", "item_armor2", "雪里蹲着的蛤蟆，皮冻得比铁硬。"),
+    (283, "野球拳", 0, "Attack", 4.0, {"Damage": 6, "SpawnCardId": 283}, "",
+     "Palm,Physical", "item_amulet2", "谁都会的一拳。打完两边都学会了这一招。"),
     # ================= 起始基础卡（只在开局牌组里出现，不进商店） =================
     (143, "劈砍", 0, "Attack", 1.4, {"Damage": 3}, "",
      "Blade,Physical", "item_saber", "最基础的刀招。砍得动，但砍不快。"),
@@ -670,9 +672,10 @@ DROP_IDS = {80, 100, 101, 102}
 
 
 def tempo(cd):
-    if cd <= 2.2:
+    # 2026-11-25 冷却统一成整秒后重定的阈值：3 秒内算快、5 秒内算中、再慢算重
+    if cd <= 3.0:
         return "Fast"
-    if cd <= 2.8:
+    if cd <= 5.0:
         return "Mid"
     return "Slow"
 
@@ -690,7 +693,7 @@ def build_card(cid, name, master, ctype, cd, values, keywords, tags, icon, desc)
     for key in ("Damage", "Spell", "Element", "Expose", "Shield", "Heal", "Poison",
                 "IgnoreShield", "HandSelf", "HandFoe", "HandTime", "Scope",
                 "HasteCount", "HasteTime", "SlowCount", "SlowTime",
-                "FreezeCount", "FreezeTime", "ChargeCount", "MultiCount"):
+                "FreezeCount", "FreezeTime", "ChargeCount", "MultiCount", "SpawnCardId"):
         if key in values and values[key] not in (0, None, "None"):
             card[key] = values[key]
     if keywords:
