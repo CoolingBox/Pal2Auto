@@ -267,7 +267,8 @@ public class RunPanel : BasePanel
         UiKit.Place(title, 0f, 34f, W, 32f, HorizontalAlignment.Center);
         _body.AddChild(title);
 
-        Label note = UiKit.MakeLabel("气血上限 " + state.MaxHp + "（每级 +" + RunState.HpPerLevel + " 已经算进去了）",
+        int gained = RunState.HpGainOfLevel(state.Level);
+        Label note = UiKit.MakeLabel("气血上限 " + state.MaxHp + "（本级 +" + gained + " 已经算进去了）",
             12, UiKit.PaperDim);
         UiKit.Place(note, 0f, 70f, W, 24f, HorizontalAlignment.Center);
         _body.AddChild(note);
@@ -653,24 +654,112 @@ public class RunPanel : BasePanel
 
     private void BuildCombat(RunState state, DayPhase phase)
     {
-        bool nemesis = phase.Type == PhaseType.Nemesis;
-        EnemyConfig enemy = PickEnemy(state, nemesis);
+        if (phase.Type == PhaseType.Nemesis)
+        {
+            BuildNemesis(state);
+            return;
+        }
+        BuildEncounterChoices(state, phase);
+    }
+
+    /// <summary>
+    /// 遭遇三选一：低 / 中 / 高三档，各从对应品阶的池子里抽一只，品阶随天数上移。
+    /// 气血读 EnemyHpConfig 的 Encounter[slot]，银两与阅历读品阶表 —— 所以「选贵的」是真的选贵的。
+    /// </summary>
+    private void BuildEncounterChoices(RunState state, DayPhase phase)
+    {
+        state.RollEncounterChoices(phase.Index);
+
+        Label kind = UiKit.MakeLabel("遭　遇　·　三选一", 20, UiKit.Gold);
+        UiKit.Place(kind, 0f, 26f, W, 30f, HorizontalAlignment.Center);
+        _body.AddChild(kind);
+
+        Label hint = UiKit.MakeLabel("越难打赏钱越多，但输了当天第 5 时辰空过", 12, UiKit.PaperDim);
+        UiKit.Place(hint, 0f, 56f, W, 22f, HorizontalAlignment.Center);
+        _body.AddChild(hint);
+
+        for (int slot = 0; slot < state.EncounterChoices.Count; slot++)
+        {
+            int enemyId = state.EncounterChoices[slot];
+            EnemyConfig enemy = ConfigManager.GetOne<EnemyConfig>(enemyId);
+            if (enemy == null)
+            {
+                continue;
+            }
+
+            int hp = RunState.EncounterHp(state.Day, slot);
+            EnemyTier tier = RunState.TierForSlot(state.Day, slot);
+            int gold = RunState.RewardGoldOf(tier);
+            int exp = RunState.RewardExpOf(tier);
+
+            float x = 156f + slot * 224f;
+            Panel card = new Panel();
+            card.Position = new Vector2(x, 90f);
+            card.Size = new Vector2(200f, 210f);
+            card.AddThemeStyleboxOverride("panel",
+                UiKit.Box(new Color(0.105f, 0.092f, 0.074f), UiKit.Gold, 1, 3));
+            _body.AddChild(card);
+
+            PortraitFrame frame = new PortraitFrame();
+            frame.Position = new Vector2(50f, 10f);
+            frame.Size = new Vector2(100f, 64f);
+            card.AddChild(frame);
+            frame.SetShape(0.22f, 0.088f);
+            frame.SetGem(new Color(0.620f, 0.300f, 0.250f), true);
+            frame.SetAccent(new Color(0.520f, 0.352f, 0.228f));
+            frame.SetAntiAlias(SettingManager.Data.AntiAlias);
+            frame.SetPortrait(enemy.Portrait);
+
+            Label name = UiKit.MakeLabel(enemy.Name, 17, UiKit.Paper);
+            UiKit.Place(name, 0f, 80f, 200f, 24f, HorizontalAlignment.Center);
+            card.AddChild(name);
+
+            Label info = UiKit.MakeLabel(RunState.TierName(tier) + "　" + hp + " 气血", 12, UiKit.PaperDim);
+            UiKit.Place(info, 0f, 104f, 200f, 20f, HorizontalAlignment.Center);
+            card.AddChild(info);
+
+            Label reward = UiKit.MakeLabel("+" + gold + " 银两 · 阅历 +" + exp, 12, UiKit.Gold);
+            UiKit.Place(reward, 0f, 126f, 200f, 20f, HorizontalAlignment.Center);
+            card.AddChild(reward);
+
+            Button fight = UiKit.MakeButton("打　它", false);
+            fight.Position = new Vector2(36f, 156f);
+            fight.Size = new Vector2(128f, 36f);
+            int chosenId = enemyId;
+            int chosenHp = hp;
+            EnemyTier chosenTier = tier;
+            fight.Pressed += () => OnPickEncounter(chosenId, chosenHp, chosenTier);
+            card.AddChild(fight);
+        }
+
+        Label note = UiKit.MakeLabel("每战满血。战斗用你当前的牌组（" + state.Deck.Count + " 张）。",
+            11, UiKit.Dim);
+        UiKit.Place(note, 0f, 318f, W, 22f, HorizontalAlignment.Center);
+        _body.AddChild(note);
+    }
+
+    private void OnPickEncounter(int enemyId, int enemyHp, EnemyTier tier)
+    {
+        RunState state = RunManager.Instance.Current;
+        state.EncounterTier = tier;
+        GameFlow.PendingEnemyId = enemyId;
+        GameFlow.PendingEnemyHp = enemyHp;
+        OnFight();
+    }
+
+    /// <summary>宿敌只有一个，没有三选一。</summary>
+    private void BuildNemesis(RunState state)
+    {
+        EnemyConfig enemy = PickEnemy(state, true);
+        int enemyHp = RunState.NemesisHp(state.Day);
         if (enemy != null)
         {
             GameFlow.PendingEnemyId = enemy.Id;
-        }
-
-        // 气血按天数算，不读敌人表里的固定值。遭遇还没有做三选一，先按中间档。
-        int enemyHp = nemesis ? RunState.NemesisHp(state.Day) : RunState.EncounterHp(state.Day, 1);
-        GameFlow.PendingEnemyHp = enemyHp;
-
-        // 奖励按品阶发，所以要记下这一场打的是哪一档
-        if (enemy != null)
-        {
             state.EncounterTier = enemy.Tier;
         }
+        GameFlow.PendingEnemyHp = enemyHp;
 
-        Label kind = UiKit.MakeLabel(nemesis ? "宿　敌" : "遭　遇", 20, nemesis ? UiKit.Vermilion : UiKit.Gold);
+        Label kind = UiKit.MakeLabel("宿　敌", 20, UiKit.Vermilion);
         UiKit.Place(kind, 0f, 30f, W, 32f, HorizontalAlignment.Center);
         _body.AddChild(kind);
 
@@ -696,17 +785,9 @@ public class RunPanel : BasePanel
             _body.AddChild(title);
         }
 
-        string warn;
-        if (nemesis)
-        {
-            warn = "胜：+" + state.NemesisReward + " 银两　负：扣 " + state.Day + " 点声望（现有 " + state.Renown + "）";
-        }
-        else
-        {
-            warn = "胜：+" + state.EncounterReward + " 银两 · 阅历 +" +
-                RunState.RewardExpOf(state.EncounterTier) + "　败：当天第 5 时辰空过";
-        }
-        Label warnLabel = UiKit.MakeLabel(warn, 13, UiKit.PaperDim);
+        Label warnLabel = UiKit.MakeLabel(
+            "胜：+" + state.NemesisReward + " 银两　负：扣 " + state.Day + " 点声望（现有 " + state.Renown + "）",
+            13, UiKit.PaperDim);
         UiKit.Place(warnLabel, 0f, 232f, W, 24f, HorizontalAlignment.Center);
         _body.AddChild(warnLabel);
 

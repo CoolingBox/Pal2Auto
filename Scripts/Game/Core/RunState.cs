@@ -36,7 +36,8 @@ public sealed class RunState
     /// <summary>每级需要的阅历。</summary>
     public const int ExpPerLevel = 8;
 
-    public const int MaxLevel = 12;
+    /// <summary>等级上限。15 天 × 每天约 1 级，留一级余量。</summary>
+    public const int MaxLevel = 15;
 
     /// <summary>2 合 1 的手续费。合成是纯增益，收一点钱让它成为硬 sink。</summary>
     public const int MergeCost = 15;
@@ -52,10 +53,42 @@ public sealed class RunState
 
     // —————————————— 等级与气血 ——————————————
 
-    /// <summary>每升一级加多少气血上限。12 级 = 基础 +154。</summary>
-    public const int HpPerLevel = 14;
+    /// <summary>
+    /// 升级加血的起点与每级增幅（参考《The Bazaar》：它每级给的血量随等级递增，
+    /// 2 级 +50 / 3 级 +100 / 4 级 +150，不是固定 +N）。
+    /// 我们缩到本作的量级：升到 2 级 +8，之后每级比上一级多 +2（2 级 +8、3 级 +10、4 级 +12…）。
+    /// 15 级累计 +294，基础 260 → 554。
+    /// </summary>
+    public const int HpGainFirst = 8;
+    public const int HpGainStep = 2;
 
-    /// <summary>13 级之后不再加血（阅历本身也封顶在 12 级）。</summary>
+    /// <summary>这一级本身给多少气血（2 级起算）。</summary>
+    public static int HpGainOfLevel(int level)
+    {
+        if (level < 2)
+        {
+            return 0;
+        }
+        return HpGainFirst + HpGainStep * (level - 2);
+    }
+
+    /// <summary>从 1 级升到 level 累计加了多少气血。</summary>
+    public static int HpGainTotal(int level)
+    {
+        int total = 0;
+        int top = level;
+        if (top > MaxLevel)
+        {
+            top = MaxLevel;
+        }
+        for (int lv = 2; lv <= top; lv++)
+        {
+            total += HpGainOfLevel(lv);
+        }
+        return total;
+    }
+
+    /// <summary>等级上限处不再加血。</summary>
     public const int HpLevelCap = MaxLevel;
 
     // —————————————— 敌方气血（读配置表，不写公式）——————————————
@@ -158,6 +191,95 @@ public sealed class RunState
         return row.Nemesis;
     }
 
+    /// <summary>
+    /// 遭遇三选一的「第 slot 档该是什么品阶」。品阶随天数上移：
+    /// 第 1~3 天 青铜/白银/黄金，第 4~7 天 白银/黄金/钻石，第 8 天起 黄金/钻石/传奇。
+    /// 这样三选一的三个选项天然是「便宜好打 / 标准 / 贵且难」。
+    /// </summary>
+    public static EnemyTier TierForSlot(int day, int slot)
+    {
+        int baseIndex;
+        if (day <= 3)
+        {
+            baseIndex = 0;
+        }
+        else if (day <= 7)
+        {
+            baseIndex = 1;
+        }
+        else
+        {
+            baseIndex = 2;
+        }
+
+        int index = baseIndex + slot;
+        if (index > 4)
+        {
+            index = 4;
+        }
+        return (EnemyTier)index;
+    }
+
+    /// <summary>roll 本次遭遇的三个候选（同一时辰内只 roll 一次）。</summary>
+    public void RollEncounterChoices(int phaseIndex)
+    {
+        if (EncounterChoices.Count == 3 && EncounterChoicesPhase == phaseIndex)
+        {
+            return;
+        }
+
+        EncounterChoices.Clear();
+        EncounterChoicesPhase = phaseIndex;
+
+        List<EnemyConfig> all = ConfigManager.GetAll<EnemyConfig>();
+        if (all == null || all.Count == 0)
+        {
+            return;
+        }
+
+        for (int slot = 0; slot < EncounterScaleLength; slot++)
+        {
+            EnemyTier want = TierForSlot(Day, slot);
+            List<EnemyConfig> pool = new List<EnemyConfig>();
+            for (int i = 0; i < all.Count; i++)
+            {
+                EnemyConfig enemy = all[i];
+                if (enemy.Tier != want)
+                {
+                    continue;
+                }
+                if (EncounterChoices.Contains(enemy.Id))
+                {
+                    continue;
+                }
+                pool.Add(enemy);
+            }
+
+            // 该品阶一只都没有就退回全池（图鉴没铺满时也不崩）
+            if (pool.Count == 0)
+            {
+                for (int i = 0; i < all.Count; i++)
+                {
+                    if (!EncounterChoices.Contains(all[i].Id))
+                    {
+                        pool.Add(all[i]);
+                    }
+                }
+            }
+
+            if (pool.Count == 0)
+            {
+                EncounterChoices.Add(all[Rng.Next(all.Count)].Id);
+                continue;
+            }
+
+            EncounterChoices.Add(pool[Rng.Next(pool.Count)].Id);
+        }
+    }
+
+    /// <summary>三选一的档数（低/中/高），与 EnemyHpConfig.Encounter 的长度一致。</summary>
+    public const int EncounterScaleLength = 3;
+
     /// <summary>当天的基础敌血（遭遇中间档），给界面上的「本日强度」这类文案用。</summary>
     public static int DayBaseHp(int day)
     {
@@ -229,6 +351,15 @@ public sealed class RunState
 
     /// <summary>事件流水，供 DevShot / 战报查看。</summary>
     public List<string> Notes = new List<string>();
+
+    /// <summary>
+    /// 本次遭遇时辰的三个候选敌人（低 / 中 / 高三档，各一个品阶）。
+    /// 存下来是为了「刷新界面不重 roll」—— 同一个时辰反复进出面板不能换人。
+    /// </summary>
+    public List<int> EncounterChoices = new List<int>();
+
+    /// <summary>EncounterChoices 是在哪个时辰 roll 的。换时辰或换天就失效。</summary>
+    public int EncounterChoicesPhase;
 
     private Random _rng;
 
@@ -329,7 +460,7 @@ public sealed class RunState
             {
                 level = HpLevelCap;
             }
-            int hp = BaseHp + HpPerLevel * (level - 1) + BonusHp;
+            int hp = BaseHp + HpGainTotal(level) + BonusHp;
             if (hp < 1)
             {
                 hp = 1;
@@ -387,20 +518,21 @@ public sealed class RunState
     }
 
     /// <summary>
-    /// 一场遭遇的阅历：黄金及以下一样（2），钻石多一点（3），传奇更多（4）。
-    /// 普通时辰固定 +1，所以遭遇的价值始终是普通时辰的两倍以上。
+    /// 一场遭遇胜利的**额外**阅历（基础 1 点每时辰都有，不在这里算）。
+    /// 黄金及以下 +1（该时辰共 2 点），钻石 +2（共 3 点），传奇 +3（共 4 点）。
+    /// 一天全胜 = 4 自由 + 2 遭遇 + 2 宿敌 = 8 点 = 正好一级；输掉战斗只剩 6 点。
     /// </summary>
     public static int RewardExpOf(EnemyTier tier)
     {
         if (tier == EnemyTier.Diamond)
         {
-            return 3;
+            return 2;
         }
         if (tier == EnemyTier.Legend)
         {
-            return 4;
+            return 3;
         }
-        return 2;
+        return 1;
     }
 
     /// <summary>品阶的中文名，界面上显示用。</summary>

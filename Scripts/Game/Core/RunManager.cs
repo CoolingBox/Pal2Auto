@@ -153,13 +153,16 @@ public sealed class RunManager : Singleton<RunManager>
         switch (phase.Type)
         {
             case PhaseType.Encounter:
+                // 每个时辰都有一点基础阅历（无论输赢），战斗胜利再加额外那份
+                Current.GainExperience(1);
                 ResolveEncounter(success);
                 break;
             case PhaseType.Nemesis:
+                Current.GainExperience(1);
                 ResolveNemesis(success);
                 break;
             default:
-                // 集市/奇遇/淬炉/空过：只给基础阅历
+                // 集市/奇遇/淬炉/空过：只有基础阅历
                 Current.GainExperience(1);
                 break;
         }
@@ -183,6 +186,7 @@ public sealed class RunManager : Singleton<RunManager>
         if (success)
         {
             int reward = Current.EncounterReward;
+            // 额外阅历（基础那 1 点已经在 ResolveCurrentPhase 里给过了）
             int exp = RunState.RewardExpOf(Current.EncounterTier);
             Current.Earn(reward);
             Current.GainExperience(exp);
@@ -193,7 +197,8 @@ public sealed class RunManager : Singleton<RunManager>
 
         // 失败代价：当天第 5 时辰作废，只给 10 银两保底。
         // 每战满血（B2）之后失败没有血量代价，必须补一个成本，否则三选一永远该选最难。
-        Current.GainExperience(1);
+        // 2026-11-25：阅历不再给 —— 打输就是「这一天少长了经验」，等级会落后半级多。
+        // 一天全胜 4+2+2 = 8 点刚好一级；输一场只剩 6 点。
         DayPhase fifth = Current.Today.Get(5);
         if (fifth != null && !fifth.Resolved)
         {
@@ -215,7 +220,7 @@ public sealed class RunManager : Singleton<RunManager>
             Current.Victories++;
             int reward = Current.NemesisReward;
             Current.Earn(reward);
-            Current.GainExperience(2);
+            Current.GainExperience(1);
             Current.Notes.Add("宿敌胜利：第 " + Current.Victories + " 胜，+" + reward + " 银两");
         }
         else
@@ -223,7 +228,6 @@ public sealed class RunManager : Singleton<RunManager>
             // 输第 N 天扣 N 点声望；扣到 0 先背水，再用就终局
             int loss = Current.Day;
             RenownOutcome outcome = Current.TakeRenownLoss(loss);
-            Current.GainExperience(1);
             if (outcome == RenownOutcome.None)
             {
                 Current.Notes.Add("宿敌失败：声望 -" + loss + " → " + Current.Renown);

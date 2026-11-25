@@ -180,7 +180,9 @@ public static class DevShot
 
         int charId = ReadCharId();
         CharacterConfig character = ConfigManager.GetOne<CharacterConfig>(charId);
-        EnemyConfig enemy = ConfigManager.GetOne<EnemyConfig>(1);
+        // --simenemy=N 指定打哪只怪（默认 1 号），用来比较同一天三档候选的难度差
+        int enemyId = ReadIntArg("--simenemy=", 1);
+        EnemyConfig enemy = ConfigManager.GetOne<EnemyConfig>(enemyId);
         if (character == null || enemy == null)
         {
             GD.Print("SIM 配置缺失 charId=" + charId);
@@ -214,6 +216,20 @@ public static class DevShot
             }
         }
 
+        // --simtier=N 统一给牌组定一个阶位（0 铜 / 1 银 / 2 金 / 3 钻）。
+        // 这是模拟「后期构筑起来」的唯一办法：不指定就是铜，跟以前的模拟等价。
+        int deckTierArg = ReadIntArg("--simtier=", 0);
+        CardTier deckTier = CardTier.Copper;
+        if (deckTierArg >= 1 && deckTierArg <= 3)
+        {
+            deckTier = (CardTier)deckTierArg;
+        }
+        List<CardConfig> battleCards = new List<CardConfig>();
+        for (int i = 0; i < playerDeck.Count; i++)
+        {
+            battleCards.Add(new RunCard(playerDeck[i], deckTier).ToBattleConfig());
+        }
+
         int wins = 0;
         float totalTime = 0f;
         int maxHand = DeckBattle.HandBase;
@@ -221,8 +237,8 @@ public static class DevShot
 
         for (int round = 0; round < rounds; round++)
         {
-            DeckBattle battle = DeckBattle.Create(character.Name, character.Portrait, playerHp,
-                new List<int>(playerDeck), enemy.Name, enemy.Portrait, enemyHp, enemy.Deck, playerSlots);
+            DeckBattle battle = DeckBattle.CreateWithCards(character.Name, character.Portrait, playerHp,
+                new List<CardConfig>(battleCards), enemy.Name, enemy.Portrait, enemyHp, enemy.Deck, playerSlots);
 
             while (!battle.Finished)
             {

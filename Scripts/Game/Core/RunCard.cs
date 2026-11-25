@@ -215,6 +215,63 @@ public sealed class RunCard
         return copy;
     }
 
+
+    /// <summary>
+    /// 转成战斗用的 CardConfig 副本：数值已经按阶位与附魔算好。
+    ///
+    /// 为什么要有这一步：`DeckBattle` 只认 CardConfig，而 CardConfig 是「配置表里的原始值」。
+    /// 直接把 CardId 丢进去，合成升阶（15 两一次）和淬炉附魔在战斗里就完全没效果 ——
+    /// 玩家花了钱升到银卡，打出来还是铜卡的伤害。
+    /// 这里做一份副本，把 RunCard 的缩放值写进去，DeckBattle 不用改一行。
+    /// </summary>
+    public CardConfig ToBattleConfig()
+    {
+        CardConfig cfg = Config;
+        if (cfg == null)
+        {
+            return null;
+        }
+
+        CardConfig copy = new CardConfig();
+        copy.Id = cfg.Id;
+        copy.Name = cfg.Name;
+        copy.Type = cfg.Type;
+        copy.Tags = cfg.Tags;
+        copy.Icon = cfg.Icon;
+        copy.Desc = cfg.Desc;
+        copy.Keywords = cfg.Keywords;
+        copy.Element = cfg.Element;
+        copy.Scope = cfg.Scope;
+        copy.Master = cfg.Master;
+        copy.MinTier = cfg.MinTier;
+        copy.StarterOnly = cfg.StarterOnly;
+
+        // 数值走 RunCard 的已缩放属性（阶位 → 附魔），不读 cfg 的原值
+        copy.Countdown = Countdown;
+        copy.Damage = Damage;
+        copy.Spell = Spell;
+        copy.Shield = Shield;
+        copy.Heal = Heal;
+        copy.Poison = Poison;
+
+        // 机制类不随阶位涨（见 Docs/卡牌等阶与商店.md），原样抄
+        copy.Expose = cfg.Expose;
+        copy.IgnoreShield = cfg.IgnoreShield;
+        copy.HandSelf = cfg.HandSelf;
+        copy.HandFoe = cfg.HandFoe;
+        copy.HandTime = cfg.HandTime;
+        copy.HasteCount = cfg.HasteCount;
+        copy.HasteTime = cfg.HasteTime;
+        copy.SlowCount = cfg.SlowCount;
+        copy.SlowTime = cfg.SlowTime;
+        copy.FreezeCount = cfg.FreezeCount;
+        copy.FreezeTime = cfg.FreezeTime;
+        copy.ChargeCount = cfg.ChargeCount;
+        copy.MultiCount = cfg.MultiCount;
+
+        return copy;
+    }
+
     /// <summary>能不能和另一张合成（同名同阶、且未到钻）。</summary>
     public bool CanMergeWith(RunCard other)
     {

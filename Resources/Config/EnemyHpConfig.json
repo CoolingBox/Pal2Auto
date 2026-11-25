@@ -2,136 +2,136 @@
   {
     "Id": 1,
     "Encounter": [
-      101,
-      110,
-      119
+      105,
+      118,
+      130
     ],
-    "Nemesis": 121
+    "Nemesis": 130
   },
   {
     "Id": 2,
     "Encounter": [
-      138,
-      150,
-      162
+      118,
+      130,
+      150
     ],
-    "Nemesis": 165
+    "Nemesis": 150
   },
   {
     "Id": 3,
     "Encounter": [
-      175,
-      190,
-      205
+      132,
+      145,
+      172
     ],
-    "Nemesis": 209
+    "Nemesis": 172
   },
   {
     "Id": 4,
     "Encounter": [
-      202,
-      220,
-      238
+      148,
+      165,
+      200
     ],
-    "Nemesis": 242
+    "Nemesis": 200
   },
   {
     "Id": 5,
     "Encounter": [
-      235,
-      255,
-      275
+      165,
+      185,
+      230
     ],
-    "Nemesis": 280
+    "Nemesis": 230
   },
   {
     "Id": 6,
     "Encounter": [
-      247,
-      268,
-      289
+      182,
+      205,
+      260
     ],
-    "Nemesis": 295
+    "Nemesis": 260
   },
   {
     "Id": 7,
     "Encounter": [
-      253,
-      275,
-      297
+      200,
+      225,
+      295
     ],
-    "Nemesis": 302
+    "Nemesis": 295
   },
   {
     "Id": 8,
     "Encounter": [
-      265,
-      288,
-      311
+      218,
+      245,
+      320
     ],
-    "Nemesis": 317
+    "Nemesis": 320
   },
   {
     "Id": 9,
     "Encounter": [
-      278,
-      302,
-      326
+      235,
+      258,
+      345
     ],
-    "Nemesis": 332
+    "Nemesis": 345
   },
   {
     "Id": 10,
     "Encounter": [
-      293,
-      318,
-      343
+      250,
+      270,
+      380
     ],
-    "Nemesis": 350
+    "Nemesis": 380
   },
   {
     "Id": 11,
     "Encounter": [
-      302,
-      328,
-      354
+      260,
+      282,
+      398
     ],
-    "Nemesis": 361
+    "Nemesis": 398
   },
   {
     "Id": 12,
     "Encounter": [
-      311,
-      338,
-      365
+      270,
+      294,
+      416
     ],
-    "Nemesis": 372
+    "Nemesis": 416
   },
   {
     "Id": 13,
     "Encounter": [
-      320,
-      348,
-      376
+      280,
+      306,
+      434
     ],
-    "Nemesis": 383
+    "Nemesis": 434
   },
   {
     "Id": 14,
     "Encounter": [
-      329,
-      358,
-      387
+      290,
+      318,
+      452
     ],
-    "Nemesis": 394
+    "Nemesis": 452
   },
   {
     "Id": 15,
     "Encounter": [
-      339,
-      368,
-      397
+      300,
+      330,
+      470
     ],
-    "Nemesis": 405
+    "Nemesis": 470
   }
 ]

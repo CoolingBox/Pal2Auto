@@ -602,26 +602,33 @@ public class BattlePanel : BasePanel
 
         // 牌组来源：局内用 RunState 的牌组（买来的、合成过的都在里面）；
         // 直接从主菜单进战斗时退回配置表，并扣掉 DeckProgress 里永久移除的卡。
-        List<int> deck = new List<int>();
+        // 注意：这里传的是「烘好数值的副本」，不是 CardId ——
+        // 传 id 会让合成升阶与淬炉附魔在战斗里完全失效（15 两一次的合成变成纯捐款）。
+        List<CardConfig> deck = new List<CardConfig>();
         RunManager run = RunManager.Instance;
         if (GameFlow.InRun && run.HasActiveRun)
         {
             for (int i = 0; i < run.Current.Deck.Count; i++)
             {
-                deck.Add(run.Current.Deck[i].CardId);
+                deck.Add(run.Current.Deck[i].ToBattleConfig());
             }
         }
         else if (character != null && character.Deck != null && character.Deck.Length > 0)
         {
-            // 配置表只读；「移除」关键字造成的永久损失记在 DeckProgress 里，这里扣掉
-            deck = DeckStore.BuildDeck(character.Id, character.Deck);
+            // 配置表只读；「移除」关键字造成的永久损失记在 DeckProgress 里，这里扣掉。
+            // 局外没有阶位概念，统一按起步铜阶烘成战斗卡。
+            List<int> ids = DeckStore.BuildDeck(character.Id, character.Deck);
+            for (int i = 0; i < ids.Count; i++)
+            {
+                deck.Add(new RunCard(ids[i], CardTier.Copper).ToBattleConfig());
+            }
         }
         else
         {
             // 兜底：没有配牌组就用前 12 张，避免开不了战
             for (int id = 1; id <= 12; id++)
             {
-                deck.Add(id);
+                deck.Add(new RunCard(id, CardTier.Copper).ToBattleConfig());
             }
         }
 
@@ -648,7 +655,7 @@ public class BattlePanel : BasePanel
             enemyHp = GameFlow.PendingEnemyHp;
         }
 
-        _battle = DeckBattle.Create(charName, portraitKey, playerHp, deck,
+        _battle = DeckBattle.CreateWithCards(charName, portraitKey, playerHp, deck,
             enemy.Name, enemy.Portrait, enemyHp, enemy.Deck, playerSlots);
 
         _accum = 0f;

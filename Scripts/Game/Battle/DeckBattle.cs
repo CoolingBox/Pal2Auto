@@ -290,6 +290,63 @@ public sealed class DeckBattle
         return battle;
     }
 
+    /// <summary>
+    /// 用「已经算好数值的卡」开战。局内走这条：玩家牌组里的每张牌带着阶位与附魔，
+    /// 由 RunCard.ToBattleConfig() 烘成 CardConfig 副本，内核不需要认识 RunCard。
+    /// </summary>
+    public static DeckBattle CreateWithCards(string playerName, string playerPortrait, int playerHp,
+        List<CardConfig> playerCards, string enemyName, string enemyPortrait, int enemyHp, int[] enemyDeck,
+        int playerHandCapacity = 0)
+    {
+        DeckBattle battle = new DeckBattle();
+        battle.Player = BuildFighterFromCards(playerName, playerPortrait, playerHp, playerCards);
+        battle.Enemy = BuildFighter(enemyName, enemyPortrait, enemyHp, new List<int>(enemyDeck));
+
+        if (playerHandCapacity > 0)
+        {
+            int slots = playerHandCapacity;
+            if (slots < 1)
+            {
+                slots = 1;
+            }
+            if (slots > HandMax)
+            {
+                slots = HandMax;
+            }
+            battle.Player.HandCapacity = slots;
+        }
+
+        battle.DrawOpeningHand();
+        return battle;
+    }
+
+    private static FighterState BuildFighterFromCards(string name, string portrait, int maxHp,
+        List<CardConfig> cards)
+    {
+        FighterState fighter = new FighterState();
+        fighter.Name = name;
+        fighter.Portrait = portrait;
+        fighter.MaxHp = maxHp;
+        fighter.Hp = maxHp;
+        fighter.Hand = new HandSlot[HandMax];
+
+        for (int i = 0; i < HandMax; i++)
+        {
+            fighter.Hand[i] = new HandSlot();
+        }
+
+        for (int i = 0; i < cards.Count; i++)
+        {
+            if (cards[i] != null)
+            {
+                fighter.DrawPile.Add(cards[i]);
+            }
+        }
+
+        Shuffle(fighter.DrawPile, new Random());
+        return fighter;
+    }
+
     private static FighterState BuildFighter(string name, string portrait, int maxHp, List<int> cardIds)
     {
         FighterState fighter = new FighterState();
