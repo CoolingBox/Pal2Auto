@@ -240,8 +240,15 @@ public static class DevShot
             DeckBattle battle = DeckBattle.CreateWithCards(character.Name, character.Portrait, playerHp,
                 new List<CardConfig>(battleCards), enemy.Name, enemy.Portrait, enemyHp, enemy.Deck, playerSlots);
 
+            // --simpoison=N 开局给玩家叠 N 层毒（验「治疗带解毒」）
+            int startPoison = ReadIntArg("--simpoison=", 0);
+            if (startPoison > 0)
+            {
+                battle.Player.PoisonStacks = startPoison;
+            }
+
             // --simstorm=1 打印沙尘暴的头几跳，验证「起始 1 伤、每跳 +1」
-            bool traceStorm = ReadIntArg("--simstorm=", 0) > 0;
+            bool traceStorm = ReadIntArg("--simstorm=", 0) > 0 || ReadIntArg("--simpoison=", 0) > 0;
             int stormPrinted = 0;
             while (!battle.Finished)
             {
@@ -250,9 +257,9 @@ public static class DevShot
                 {
                     for (int e = 0; e < stepEvents.Count; e++)
                     {
-                        if (stepEvents[e].Text != null && stepEvents[e].Text.StartsWith("沙尘暴"))
+                        if (stepEvents[e].Text != null && stepEvents[e].Text.StartsWith("化毒"))
                         {
-                            GD.Print("STORM " + stepEvents[e].Text + " / 实扣 " + stepEvents[e].Value);
+                            GD.Print("CURE " + stepEvents[e].Text);
                             stormPrinted++;
                         }
                     }

@@ -151,6 +151,7 @@ public sealed class FighterState
     public int Shield;
     public int PoisonStacks;
     public float PoisonAccum;
+    public float PoisonDecay;
 
     /// <summary>破绽层数：每层使其受到的所有伤害 +15%，最多 3 层，4 秒后清零。</summary>
     public int ExposeStacks;
@@ -214,10 +215,13 @@ public sealed class DeckBattle
     /// <summary>上场数上限。界面按这个数建槽位，改这里要同步改 BattlePanel 的布局。</summary>
     public const int HandMax = 8;
     /// <summary>
-    /// 每层毒每秒掉多少血。2026-11-24 从 1.0 降到 0.7：毒无视护体、不衰减、能叠 20 层，
-    /// 是全局最强的滚雪球，苏媚靠一张 82 灵蛇出洞就能把第 1~2 天打到 100%。
+    /// 每层毒每秒掉多少血。**1.0**（2026-11-25 用户定）。
+    /// 「毒设计保守点」指的是**卡牌给的层数低**，不是削弱每层的伤害 ——
+    /// 机制保持锋利（每层 1 伤、不封顶、不衰减），锋利度靠卡面数值控制：
+    /// 铜卡给 1 层、银卡 2 层、金卡 3 层。
+    /// 注：毒**穿护体**（`ApplyDamage(..., ignoreShield: true)`），护体挡不住它。
     /// </summary>
-    public const float PoisonPerStackPerSecond = 0.5f;
+    public const float PoisonPerStackPerSecond = 1.0f;
     // —————————————— 沙尘暴（衰歇期）——————————————
     //
     // 参考《The Bazaar》：战斗拖到一定时间后，双方一起掉血，逼「只堆护体 / 治疗不出输出」的构筑没法靠磨赢。
@@ -277,8 +281,8 @@ public sealed class DeckBattle
     /// </summary>
     public const int ShieldCap = 9999;
 
-    /// <summary>毒层上限。不封顶的话长战斗会变成「毒一发，敌人自己死」。</summary>
-    public const int PoisonMaxStacks = 20;
+    /// <summary>毒层**不设上限**（2026-11-25 用户定）：层数多少全靠卡牌给几层，机制本身不封顶。</summary>
+    public const int PoisonMaxStacks = 999;
 
     /// <summary>每使用一次牌的补抽冷却。多重按结算次数累加：多重 2 = 0.5 秒。</summary>
     public const float RefillPerPlay = 0.25f;
@@ -678,8 +682,10 @@ public sealed class DeckBattle
         int tick = (int)owner.PoisonAccum;
         owner.PoisonAccum -= tick;
 
+        // 毒**穿护体**（2026-11-25 用户定）：护体是「挡刀」的，挡不了血里的毒。
+        // 这是它区别于普通伤害的唯一性质 —— 所以它的 CD 要拉长、层数要给得低。
         int absorbed;
-        int lost = ApplyDamage(owner, tick, false, out absorbed);
+        int lost = ApplyDamage(owner, tick, true, out absorbed);
         owner.Stats.PoisonDamage += lost;
         if (lost > 0)
         {
@@ -863,15 +869,41 @@ public sealed class DeckBattle
         {
             int before = owner.Hp;
             owner.Hp = Math.Min(owner.MaxHp, owner.Hp + card.Heal);
+            int healed = owner.Hp - before;
 
             BattleEvent heal = new BattleEvent();
             heal.Kind = BattleEventKind.Heal;
             heal.Side = SideOf(owner);
             heal.Slot = slot;
-            heal.Value = owner.Hp - before;
-            heal.Text = "回气 +" + (owner.Hp - before);
-            owner.Stats.Healed += owner.Hp - before;
+            heal.Value = healed;
+            heal.Text = "回气 +" + healed;
+            owner.Stats.Healed += healed;
             events.Add(heal);
+
+            // 治疗带解毒：清掉「实际回复量 10%」的毒层（最少 1 层，满血也清）。
+            // 这是守赢流唯一的解药 —— 毒无视护体，不给解毒的话「堆盾」永远被毒流吃死。
+            int cleanse = healed / 10;
+            if (cleanse < 1)
+            {
+                cleanse = 1;
+            }
+            if (owner.PoisonStacks > 0)
+            {
+                int stacksBefore = owner.PoisonStacks;
+                owner.PoisonStacks -= cleanse;
+                if (owner.PoisonStacks < 0)
+                {
+                    owner.PoisonStacks = 0;
+                }
+
+                BattleEvent cure = new BattleEvent();
+                cure.Kind = BattleEventKind.Poison;
+                cure.Side = SideOf(owner);
+                cure.Slot = slot;
+                cure.Value = stacksBefore - owner.PoisonStacks;
+                cure.Text = "化毒 −" + (stacksBefore - owner.PoisonStacks) + " 层";
+                events.Add(cure);
+            }
         }
 
         if (card.Expose > 0)
