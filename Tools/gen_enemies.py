@@ -104,10 +104,17 @@ MONSTERS = [
 
 def load_cards():
     with open(CARDS, encoding="utf-8") as f:
-        return json.load(f)
+        cards = json.load(f)
+    # 配表已按阶展开（1~283 铜 / 1001+ 银 / 2001+ 金 / 3001+ 钻）。
+    # 这里只用「铜起步」的条目组牌，最后按怪的品阶整体映射到对应 id 区间 ——
+    # 这样同一套骨架在青铜怪手里是铜卡、在钻石怪手里是钻卡，强度跟着品阶走。
+    return [c for c in cards if c["Id"] < 1000 and c.get("MinTier") == "Copper"]
 
 
 MIN_TIER_RANK = {"Copper": 0, "Silver": 1, "Gold": 2, "Diamond": 3}
+
+# 怪的品阶 → 用几阶的卡（Legend 放开到钻）
+MONSTER_TIER_RANK = {"Bronze": 0, "Silver": 1, "Gold": 2, "Diamond": 3, "Legend": 3}
 
 # 怪的品阶 ≠ 卡的阶位名：青铜怪用铜卡，传奇怪放开到钻卡
 TIER_CAP = {"Bronze": 0, "Silver": 1, "Gold": 2, "Diamond": 3, "Legend": 3}
@@ -211,7 +218,11 @@ def build_deck(tier, prefer, cards, rng):
     if rest > 0:
         extra += [c["Id"] for c in pick(other_mech, prefer, rest, rng, used)]
 
-    return base + extra
+    # 敌人暂时**统一用铜卡**（rank 恒 0）：展开后试过「怪按品阶用对应阶的卡」，
+    # 实测金怪（24 伤的大刀·金）在 D7 把玩家 20 秒打死 —— 玩家的构筑速度（买 105 两一张金卡）
+    # 追不上敌人品阶的爬升。等玩家侧的经济或成长曲线调好，再把 MONSTER_TIER_RANK 接回来。
+    rank = 0
+    return [cid + 1000 * rank for cid in base + extra]
 
 
 def main():

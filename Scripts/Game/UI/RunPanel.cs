@@ -38,6 +38,9 @@ public class RunPanel : BasePanel
     /// <summary>集市里的子视图：0 = 买卡，1 = 删牌选牌。</summary>
     private int _shopMode;
 
+    /// <summary>百炼台里已经点选的牌（最多 2 张）。</summary>
+    private readonly List<RunCard> _forgePicked = new List<RunCard>();
+
     public override void OnBind(Control control)
     {
         base.OnBind(control);
@@ -241,7 +244,11 @@ public class RunPanel : BasePanel
         {
             BuildShop(state, phase);
         }
-        else if (phase.Type == PhaseType.Event || phase.Type == PhaseType.Forge)
+        else if (phase.Type == PhaseType.Event)
+        {
+            BuildForgeEvent(state, phase);
+        }
+        else if (phase.Type == PhaseType.Forge)
         {
             BuildPlaceholder(phase);
         }
@@ -833,6 +840,160 @@ public class RunPanel : BasePanel
     }
 
     // —————————————————————— 占位与结算 ——————————————————————
+
+    /// <summary>百炼台：上方 5 张候选（点选），下方 3 个选项。</summary>
+    private void BuildForgeEvent(RunState state, DayPhase phase)
+    {
+        state.OpenForgeEvent(phase.Index);
+        ForgeEvent forge = state.PendingForge;
+        if (forge == null)
+        {
+            BuildPlaceholder(phase);
+            return;
+        }
+
+        Label title = UiKit.MakeLabel("百　炼　台", 22, UiKit.Gold);
+        UiKit.Place(title, 0f, 18f, W, 30f, HorizontalAlignment.Center);
+        _body.AddChild(title);
+
+        Label hint = UiKit.MakeLabel(
+            forge.Resolved
+                ? "炉火已熄，这个时辰过去了"
+                : "先点牌、再点下方选项（合成要选两张）",
+            12, UiKit.PaperDim);
+        UiKit.Place(hint, 0f, 48f, W, 22f, HorizontalAlignment.Center);
+        _body.AddChild(hint);
+
+        for (int i = 0; i < forge.Candidates.Count; i++)
+        {
+            RunCard card = forge.Candidates[i];
+            bool picked = _forgePicked.Contains(card);
+            float x = 135f + i * 140f;
+
+            Panel frame = new Panel();
+            frame.Position = new Vector2(x, 78f);
+            frame.Size = new Vector2(130f, 150f);
+            Color border = picked ? UiKit.Gold : new Color(0.300f, 0.250f, 0.180f);
+            frame.AddThemeStyleboxOverride("panel",
+                UiKit.Box(new Color(0.105f, 0.092f, 0.074f), border, picked ? 3 : 1, 3));
+            _body.AddChild(frame);
+
+            Label name = UiKit.MakeLabel(card.CardName, 15, UiKit.Paper);
+            UiKit.Place(name, 0f, 8f, 130f, 22f, HorizontalAlignment.Center);
+            frame.AddChild(name);
+
+            Label tier = UiKit.MakeLabel(CardTierRules.Name(card.Tier) + "阶", 11, TierColor(card.Tier));
+            UiKit.Place(tier, 0f, 30f, 130f, 18f, HorizontalAlignment.Center);
+            frame.AddChild(tier);
+
+            Label stat = UiKit.MakeLabel(CardStatLine(card), 11, UiKit.PaperDim);
+            UiKit.Place(stat, 0f, 52f, 130f, 18f, HorizontalAlignment.Center);
+            frame.AddChild(stat);
+
+            Label cd = UiKit.MakeLabel("蓄势 " + card.Countdown.ToString("0.0") + " 秒", 11, UiKit.Dim);
+            UiKit.Place(cd, 0f, 72f, 130f, 18f, HorizontalAlignment.Center);
+            frame.AddChild(cd);
+
+            RunCard target = card;
+            Button pickButton = UiKit.MakeButton(picked ? "已选" : "选它", false);
+            pickButton.Position = new Vector2(15f, 100f);
+            pickButton.Size = new Vector2(100f, 32f);
+            pickButton.Disabled = forge.Resolved;
+            pickButton.Pressed += () => OnForgePick(target);
+            frame.AddChild(pickButton);
+        }
+
+        for (int i = 0; i < forge.Options.Count; i++)
+        {
+            ForgeOption option = forge.Options[i];
+            float x = 156f + i * 224f;
+
+            Panel box = new Panel();
+            box.Position = new Vector2(x, 246f);
+            box.Size = new Vector2(200f, 96f);
+            box.AddThemeStyleboxOverride("panel",
+                UiKit.Box(new Color(0.100f, 0.088f, 0.070f), UiKit.Gold, 1, 3));
+            _body.AddChild(box);
+
+            // 权重 ≤5 的选项标「稀有」：合成 / 放逐 / 磨砺 / 换命 —— 都是本身净赚的那种
+            bool rare = option.Weight <= 5;
+            string optLabel = rare ? option.Name + "　稀" : option.Name;
+            Label optName = UiKit.MakeLabel(optLabel, 17, rare ? UiKit.Vermilion : UiKit.Gold);
+            UiKit.Place(optName, 0f, 6f, 200f, 24f, HorizontalAlignment.Center);
+            box.AddChild(optName);
+
+            Label optDesc = UiKit.MakeLabel(option.Desc, 10, UiKit.PaperDim);
+            optDesc.AutowrapMode = TextServer.AutowrapMode.Word;
+            UiKit.Place(optDesc, 10f, 30f, 180f, 34f, HorizontalAlignment.Center);
+            box.AddChild(optDesc);
+
+            ForgeOption picked = option;
+            Button apply = UiKit.MakeButton("选它", false);
+            apply.Position = new Vector2(50f, 64f);
+            apply.Size = new Vector2(100f, 26f);
+            apply.Disabled = forge.Resolved;
+            apply.Pressed += () => OnForgeApply(picked);
+            box.AddChild(apply);
+        }
+
+        Label note = UiKit.MakeLabel("牌库 " + state.Deck.Count + " 张　银两 " + state.Gold, 11, UiKit.Dim);
+        UiKit.Place(note, 0f, 352f, W, 22f, HorizontalAlignment.Center);
+        _body.AddChild(note);
+    }
+
+    private static string CardStatLine(RunCard card)
+    {
+        List<string> parts = new List<string>();
+        if (card.Damage > 0)
+        {
+            parts.Add("攻 " + card.Damage);
+        }
+        if (card.Spell > 0)
+        {
+            parts.Add("法 " + card.Spell);
+        }
+        if (card.Shield > 0)
+        {
+            parts.Add("护 " + card.Shield);
+        }
+        if (card.Heal > 0)
+        {
+            parts.Add("疗 " + card.Heal);
+        }
+        if (card.Poison > 0)
+        {
+            parts.Add("毒 " + card.Poison);
+        }
+        return string.Join(" ", parts);
+    }
+
+    private void OnForgePick(RunCard card)
+    {
+        if (_forgePicked.Contains(card))
+        {
+            _forgePicked.Remove(card);
+        }
+        else
+        {
+            if (_forgePicked.Count >= 2)
+            {
+                _forgePicked.RemoveAt(0);
+            }
+            _forgePicked.Add(card);
+        }
+        Refresh();
+    }
+
+    private void OnForgeApply(ForgeOption option)
+    {
+        RunState state = RunManager.Instance.Current;
+        bool ok = state.ApplyForgeOption(option, new List<RunCard>(_forgePicked));
+        if (ok)
+        {
+            _forgePicked.Clear();
+        }
+        Refresh();
+    }
 
     private void BuildPlaceholder(DayPhase phase)
     {

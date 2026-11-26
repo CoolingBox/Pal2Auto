@@ -88,9 +88,9 @@ public sealed class ShopStock
                 continue;
             }
 
-            usedIds.Add(config.Id);
+            usedIds.Add(CardTierRules.BaseIdOf(config.Id));
             ShopOffer offer = new ShopOffer();
-            offer.Card = new RunCard(config.Id, actualTier);
+            offer.Card = new RunCard(config.Id, config.MinTier);
             offer.Price = PriceOf(actualTier, Grade);
             offer.Sold = false;
             Offers.Add(offer);

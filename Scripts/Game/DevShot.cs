@@ -48,6 +48,10 @@ public static class DevShot
             {
                 OpenRunLater(host, "shop");
             }
+            if (all[i] == "--ui=runevent")
+            {
+                OpenRunLater(host, "event");
+            }
             if (all[i] == "--ui=runfight")
             {
                 OpenRunLater(host, "fight");
@@ -230,6 +234,14 @@ public static class DevShot
             battleCards.Add(new RunCard(playerDeck[i], deckTier).ToBattleConfig());
         }
 
+        // --simpriority=1 给牌组第一张打「先发」，统计它进起手的比例（对照默认随机）
+        bool testPriority = ReadIntArg("--simpriority=", 0) > 0;
+        if (testPriority && battleCards.Count > 0)
+        {
+            battleCards[0].PriorityDraw = true;
+        }
+        int priorityHits = 0;
+
         int wins = 0;
         float totalTime = 0f;
         int maxHand = DeckBattle.HandBase;
@@ -250,6 +262,18 @@ public static class DevShot
             // --simstorm=1 打印沙尘暴的头几跳，验证「起始 1 伤、每跳 +1」
             bool traceStorm = ReadIntArg("--simstorm=", 0) > 0 || ReadIntArg("--simpoison=", 0) > 0;
             int stormPrinted = 0;
+            if (testPriority && battleCards.Count > 0)
+            {
+                for (int h = 0; h < battle.Player.Hand.Length; h++)
+                {
+                    if (battle.Player.Hand[h].Card == battleCards[0])
+                    {
+                        priorityHits++;
+                        break;
+                    }
+                }
+            }
+
             while (!battle.Finished)
             {
                 List<BattleEvent> stepEvents = battle.Step(0.05f);
@@ -293,6 +317,12 @@ public static class DevShot
         GD.Print("SIM " + character.Name + " vs " + enemy.Name + "(敌 " + enemyHp + " / 我 " + playerHp +
                  " 血)：" + rounds + " 场 " + wins + " 胜（" + Mathf.RoundToInt(100f * wins / rounds) +
                  "%），均时 " + (totalTime / rounds).ToString("0.0") + " 秒，上场数区间 " + minHand + "~" + maxHand);
+        if (testPriority)
+        {
+            GD.Print("PRIORITY 起手含先发卡 " + priorityHits + "/" + rounds +
+                "（" + Mathf.RoundToInt(100f * priorityHits / rounds) + "%）");
+        }
+
         // headless 下 Quit 紧跟 print 会丢掉标准输出缓冲，重定向到文件时看不到结果
         System.Console.Out.Flush();
         host.GetTree().Quit(0);
@@ -329,9 +359,120 @@ public static class DevShot
             run.Current.Day = dayOverride;
         }
 
+        // --forgestat=N 连开 N 次百炼台，统计每个选项的出现频率（验权重）
+        int forgeStat = ReadIntArg("--forgestat=", 0);
+        if (forgeStat > 0)
+        {
+            RunState st = run.Current;
+            Dictionary<ForgeOptionKind, int> counter = new Dictionary<ForgeOptionKind, int>();
+            for (int i = 0; i < forgeStat; i++)
+            {
+                st.PendingForge = null;
+                st.ForgePhaseIndex = -1;
+                st.OpenForgeEvent(0);
+                if (st.PendingForge == null)
+                {
+                    continue;
+                }
+                for (int k = 0; k < st.PendingForge.Options.Count; k++)
+                {
+                    ForgeOptionKind kind = st.PendingForge.Options[k].Kind;
+                    if (!counter.ContainsKey(kind))
+                    {
+                        counter[kind] = 0;
+                    }
+                    counter[kind]++;
+                }
+            }
+
+            GD.Print("FORGESTAT 共 " + forgeStat + " 次，每次 3 个选项，合计 " + (forgeStat * 3));
+            foreach (KeyValuePair<ForgeOptionKind, int> pair in counter)
+            {
+                GD.Print("FORGESTAT " + pair.Key + " " + pair.Value + " 次（" +
+                    (100f * pair.Value / (forgeStat * 3f)).ToString("0.0") + "%）");
+            }
+            System.Console.Out.Flush();
+            host.GetTree().Quit(0);
+            return;
+        }
+
+        // --forgeact=merge|sharp|quick|multi 直接跑一次百炼台结算（不依赖 UI），验数值改动
+        string forgeAct = ReadStringArg("--forgeact=", "");
+        if (forgeAct.Length > 0)
+        {
+            RunState st = run.Current;
+            st.OpenForgeEvent(0);
+            ForgeEvent forge = st.PendingForge;
+            GD.Print("FORGE 牌库 " + st.Deck.Count + " 张，候选 " + (forge == null ? -1 : forge.Candidates.Count));
+
+            if (forge != null && forge.Candidates.Count >= 2)
+            {
+                RunCard a = forge.Candidates[0];
+                RunCard b = forge.Candidates[1];
+                GD.Print("FORGE 前 " + a.CardName + " 攻 " + a.Damage + " 蓄 " + a.Countdown.ToString("0.0"));
+                GD.Print("FORGE 前 " + b.CardName + " 攻 " + b.Damage + " 蓄 " + b.Countdown.ToString("0.0"));
+
+                ForgeOption opt = new ForgeOption();
+                opt.Kind = ForgeOptionKind.Merge;
+                opt.TargetCount = 2;
+                if (forgeAct == "sharp")
+                {
+                    opt.Kind = ForgeOptionKind.Sharp;
+                    opt.TargetCount = 1;
+                }
+                else if (forgeAct == "quick")
+                {
+                    opt.Kind = ForgeOptionKind.QuickDraw;
+                    opt.TargetCount = 1;
+                }
+                else if (forgeAct == "multi")
+                {
+                    opt.Kind = ForgeOptionKind.Multi;
+                    opt.TargetCount = 1;
+                }
+                else if (forgeAct == "transmute")
+                {
+                    opt.Kind = ForgeOptionKind.Transmute;
+                    opt.TargetCount = 1;
+                }
+                else if (forgeAct == "greed")
+                {
+                    opt.Kind = ForgeOptionKind.Greed;
+                    opt.TargetCount = 0;
+                }
+                else if (forgeAct == "exile")
+                {
+                    opt.Kind = ForgeOptionKind.Exile;
+                    opt.TargetCount = 1;
+                }
+
+                List<RunCard> targets = new List<RunCard>();
+                targets.Add(a);
+                if (opt.TargetCount == 2)
+                {
+                    targets.Add(b);
+                }
+
+                bool ok = st.ApplyForgeOption(opt, targets);
+                string lastNote = st.Notes.Count > 0 ? st.Notes[st.Notes.Count - 1] : "（无记录）";
+                GD.Print("FORGE " + forgeAct + " 成功=" + ok + "，牌库 " + st.Deck.Count + " 张");
+                GD.Print("FORGE 记录：" + lastNote);
+                if (ok && st.Deck.Count > 0)
+                {
+                    RunCard shown = st.Deck[0];
+                    GD.Print("FORGE 牌组首张：" + shown.CardName + " 攻 " + shown.Damage +
+                        " 蓄 " + shown.Countdown.ToString("0.0"));
+                }
+            }
+        }
+
         if (mode == "shop")
         {
             run.SelectFreePhase(PhaseType.Shop);
+        }
+        else if (mode == "event")
+        {
+            run.SelectFreePhase(PhaseType.Event);
         }
         else if (mode == "remove")
         {

@@ -361,6 +361,9 @@ public sealed class RunState
     /// <summary>EncounterChoices 是在哪个时辰 roll 的。换时辰或换天就失效。</summary>
     public int EncounterChoicesPhase;
 
+    /// <summary>当前时辰的「百炼台」现场（奇遇时辰打开）。</summary>
+    public ForgeEvent PendingForge;
+
     private Random _rng;
 
     /// <summary>随机源。读档后按 Seed 重建，不序列化。</summary>
@@ -596,12 +599,53 @@ public sealed class RunState
 
     // —————————————————————— 牌组 ——————————————————————
 
+    /// <summary>
+    /// 获得一张牌。**同族已经在牌组里就直接升阶，不再堆第二张**（2026-11-26 用户设定）：
+    /// 买 / 捡到一张你已经有的牌，等于把它往上推一阶，而不是让牌组里躺两张同名卡。
+    ///
+    /// 升的是「同族里阶位最低的那张」，所以牌组永远是「每族一张、只往上涨」；
+    /// 改的是同一张 RunCard 的 CardId，`BonusDamage` 之类的实例修正与附魔自然继承。
+    /// 已经钻阶的不再升，按新卡加入。
+    /// </summary>
     public void AddCard(RunCard card)
     {
         if (card == null)
         {
             return;
         }
+
+        int baseId = CardTierRules.BaseIdOf(card.CardId);
+        int lowestIndex = -1;
+        CardTier lowest = CardTier.Diamond;
+
+        for (int i = 0; i < Deck.Count; i++)
+        {
+            if (CardTierRules.BaseIdOf(Deck[i].CardId) != baseId)
+            {
+                continue;
+            }
+            if (Deck[i].NoUpgrade)
+            {
+                // 贪婪塞的卡不能被「再获得即升阶」吃掉
+                continue;
+            }
+            if (lowestIndex < 0 || (int)Deck[i].Tier < (int)lowest)
+            {
+                lowest = Deck[i].Tier;
+                lowestIndex = i;
+            }
+        }
+
+        if (lowestIndex >= 0 && CardTierRules.CanMerge(lowest))
+        {
+            RunCard target = Deck[lowestIndex];
+            CardTier next = CardTierRules.Next(lowest);
+            string before = target.DisplayName;
+            target.CardId = CardTierRules.TierIdOf(baseId, next);
+            Notes.Add("再次获得「" + target.CardName + "」：" + before + " → " + target.DisplayName);
+            return;
+        }
+
         Deck.Add(card);
     }
 
@@ -610,6 +654,10 @@ public sealed class RunState
         int count = 0;
         for (int i = 0; i < Deck.Count; i++)
         {
+            if (Deck[i].NoUpgrade)
+            {
+                continue;
+            }
             if (Deck[i].CardId == cardId && Deck[i].Tier == tier)
             {
                 count++;
@@ -657,7 +705,7 @@ public sealed class RunState
         return result;
     }
 
-    /// <summary>2 合 1：消耗两张同名同阶 + 15 银两，产出一张高一阶。</summary>
+    /// <summary>2 合 1：消耗两张同名同阶 + 15 银两，产出一张高一阶（换的是 CardId）。</summary>
     public bool TryMerge(int cardId, CardTier tier)
     {
         if (!CardTierRules.CanMerge(tier))
@@ -680,6 +728,10 @@ public sealed class RunState
             {
                 break;
             }
+            if (Deck[i].NoUpgrade)
+            {
+                continue;
+            }
             if (Deck[i].CardId == cardId && Deck[i].Tier == tier)
             {
                 Deck.RemoveAt(i);
@@ -687,7 +739,8 @@ public sealed class RunState
             }
         }
 
-        RunCard merged = new RunCard(cardId, CardTierRules.Next(tier));
+        int nextId = CardTierRules.TierIdOf(CardTierRules.BaseIdOf(cardId), CardTierRules.Next(tier));
+        RunCard merged = new RunCard(nextId, CardTierRules.Next(tier));
         Deck.Add(merged);
         Notes.Add("合成 " + merged.DisplayName + "（消耗 2 张" + CardTierRules.Name(tier) + "阶同名卡，" +
             MergeCost + " 银两）");
@@ -759,8 +812,10 @@ public sealed class RunState
         }
 
         offer.Sold = true;
-        Deck.Add(offer.Card);
-        Notes.Add("买入 " + offer.Card.DisplayName + "，花 " + offer.Price + " 银两");
+        string bought = offer.Card.DisplayName;
+        // 走 AddCard：同族已在牌组里就会直接升阶，而不是再堆一张（2026-11-26 设定）
+        AddCard(offer.Card);
+        Notes.Add("买入 " + bought + "，花 " + offer.Price + " 银两");
         return true;
     }
 
@@ -834,6 +889,290 @@ public sealed class RunState
             PendingRewards.AddRange(PickRewards(RewardChoices));
         }
     }
+
+    // —————————————————————— 百炼台（奇遇）——————————————————————
+
+    /// <summary>开一场百炼台：抽 5 张候选 + 3 个随机选项。同一时辰不重复 roll。</summary>
+    public void OpenForgeEvent(int phaseIndex)
+    {
+        if (PendingForge != null && !PendingForge.Resolved && ForgePhaseIndex == phaseIndex)
+        {
+            return;
+        }
+
+        ForgeEvent ev = new ForgeEvent();
+        List<RunCard> pool = new List<RunCard>(Deck);
+        for (int i = 0; i < 5 && pool.Count > 0; i++)
+        {
+            int pick = Rng.Next(pool.Count);
+            ev.Candidates.Add(pool[pick]);
+            pool.RemoveAt(pick);
+        }
+
+        List<ForgeOption> options = AllForgeOptions();
+        for (int i = 0; i < 3 && options.Count > 0; i++)
+        {
+            int pick = WeightedPick(options);
+            ev.Options.Add(options[pick]);
+            options.RemoveAt(pick);
+        }
+
+        PendingForge = ev;
+        ForgePhaseIndex = phaseIndex;
+    }
+
+    /// <summary>百炼台是在哪个时辰开的（同一时辰不重 roll）。</summary>
+    public int ForgePhaseIndex = -1;
+
+    private static List<ForgeOption> AllForgeOptions()
+    {
+        List<ForgeOption> list = new List<ForgeOption>();
+
+        // 权重口径（2026-11-26）：「移除牌库 / 无代价提速 / 合成」本身是净赚，
+        // 这类选项权重压到 4~5，否则每次开炉都摆到脸上，百炼台就退化成「白嫖台」。
+        list.Add(MakeOption(ForgeOptionKind.Merge, "合成", "选 2 张：数值与蓄势全部相加，合成一张", 2, 0, 4));
+        list.Add(MakeOption(ForgeOptionKind.Exile, "放逐", "选 1 张：移出牌库，但气血上限 -10", 1, 0, 4));
+        list.Add(MakeOption(ForgeOptionKind.Whet, "磨砺", "选 1 张：蓄势 -0.5 秒，不牺牲数值", 1, 0, 5));
+        list.Add(MakeOption(ForgeOptionKind.Vitality, "换命", "选 1 张：移出牌库，气血上限 +15", 1, 0, 5));
+
+        list.Add(MakeOption(ForgeOptionKind.Transmute, "变换", "选 1 张：随机变成另一张同阶卡（可能抽到别派绝学）", 1, 0, 8));
+        list.Add(MakeOption(ForgeOptionKind.Sharp, "锋利", "选 1 张：伤害 +2", 1, 0));
+        list.Add(MakeOption(ForgeOptionKind.Quench, "淬甲", "选 1 张：护体 / 治疗 +2", 1, 0));
+        list.Add(MakeOption(ForgeOptionKind.Priority, "先发", "选 1 张：战斗开始时优先上手", 1, 0));
+        list.Add(MakeOption(ForgeOptionKind.Bottom, "后发", "选 1 张：洗牌后沉到牌库底", 1, 0));
+        list.Add(MakeOption(ForgeOptionKind.Multi, "多动", "选 1 张：多重 +1，蓄势 +1 秒", 1, 0));
+        list.Add(MakeOption(ForgeOptionKind.QuickDraw, "快枪", "选 1 张：蓄势 -1 秒，但数值减半", 1, 0));
+        list.Add(MakeOption(ForgeOptionKind.Greed, "贪婪", "牌库塞一张铜阶基础卡（永不升级），另得 40 银两", 0, 40));
+        list.Add(MakeOption(ForgeOptionKind.Transcribe, "抄录", "选 1 张：复制一张同阶同名卡进牌库", 1, 0));
+        return list;
+    }
+
+    private static ForgeOption MakeOption(ForgeOptionKind kind, string name, string desc,
+        int targets, int gold, int weight = 10)
+    {
+        ForgeOption option = new ForgeOption();
+        option.Kind = kind;
+        option.Name = name;
+        option.Desc = desc;
+        option.TargetCount = targets;
+        option.Gold = gold;
+        option.Weight = weight;
+        return option;
+    }
+
+    /// <summary>结算一个百炼台选项。targets 是玩家点选的牌（可以来自候选，也可以来自牌组）。</summary>
+    public bool ApplyForgeOption(ForgeOption option, List<RunCard> targets)
+    {
+        if (option == null || PendingForge == null || PendingForge.Resolved)
+        {
+            return false;
+        }
+        if (targets == null)
+        {
+            targets = new List<RunCard>();
+        }
+        if (targets.Count < option.TargetCount)
+        {
+            return false;
+        }
+
+        if (option.Kind == ForgeOptionKind.Merge)
+        {
+            RunCard first = targets[0];
+            RunCard second = targets[1];
+            if (first == second)
+            {
+                return false;
+            }
+
+            // 数值与蓄势全部相加，落在第一张上（第二张消失）
+            first.BonusDamage += second.Damage;
+            first.BonusShield += second.Shield;
+            first.BonusHeal += second.Heal;
+            first.BonusPoison += second.Poison;
+            first.BonusCountdown += second.Countdown;
+            first.BuffCount++;
+            Deck.Remove(second);
+            Notes.Add("百炼：合成「" + first.CardName + "」+" +
+                second.CardName + "（蓄势 +" + second.Countdown.ToString("0.0") + " 秒）");
+        }
+        else if (option.Kind == ForgeOptionKind.Priority)
+        {
+            targets[0].PriorityDraw = true;
+            targets[0].BuffCount++;
+            Notes.Add("百炼：先发「" + targets[0].CardName + "」");
+        }
+        else if (option.Kind == ForgeOptionKind.Bottom)
+        {
+            targets[0].BottomOfDeck = true;
+            targets[0].BuffCount++;
+            Notes.Add("百炼：后发「" + targets[0].CardName + "」");
+        }
+        else if (option.Kind == ForgeOptionKind.Sharp)
+        {
+            targets[0].BonusDamage += 2;
+            targets[0].BuffCount++;
+            Notes.Add("百炼：锋利「" + targets[0].CardName + "」伤害 +2");
+        }
+        else if (option.Kind == ForgeOptionKind.QuickDraw)
+        {
+            targets[0].ValueScale *= 0.5f;
+            targets[0].BonusCountdown -= 1f;
+            targets[0].BuffCount++;
+            Notes.Add("百炼：快枪「" + targets[0].CardName + "」蓄势 -1 秒，数值减半");
+        }
+        else if (option.Kind == ForgeOptionKind.Multi)
+        {
+            targets[0].BonusMulti += 1;
+            targets[0].BonusCountdown += 1f;
+            targets[0].BuffCount++;
+            Notes.Add("百炼：多动「" + targets[0].CardName + "」多重 +1，蓄势 +1 秒");
+        }
+        else if (option.Kind == ForgeOptionKind.Exile)
+        {
+            // 删牌本身是奖励（集市删一张要 60 两），所以这里必须挂代价
+            Deck.Remove(targets[0]);
+            BonusHp -= 10;
+            if (BonusHp < 0)
+            {
+                BonusHp = 0;
+            }
+            Notes.Add("百炼：放逐「" + targets[0].CardName + "」，气血上限 -10");
+        }
+        else if (option.Kind == ForgeOptionKind.Quench)
+        {
+            targets[0].BonusShield += 2;
+            targets[0].BonusHeal += 2;
+            targets[0].BuffCount++;
+            Notes.Add("百炼：淬甲「" + targets[0].CardName + "」护体/治疗 +2");
+        }
+        else if (option.Kind == ForgeOptionKind.Whet)
+        {
+            targets[0].BonusCountdown -= 0.5f;
+            targets[0].BuffCount++;
+            Notes.Add("百炼：磨砺「" + targets[0].CardName + "」蓄势 -0.5 秒");
+        }
+        else if (option.Kind == ForgeOptionKind.Vitality)
+        {
+            Deck.Remove(targets[0]);
+            BonusHp += 15;
+            Notes.Add("百炼：换命「" + targets[0].CardName + "」气血上限 +15");
+        }
+        else if (option.Kind == ForgeOptionKind.Transmute)
+        {
+            int newId = RandomSameTierCard(targets[0]);
+            if (newId <= 0)
+            {
+                return false;
+            }
+            string oldName = targets[0].CardName;
+            int index = Deck.IndexOf(targets[0]);
+            RunCard fresh = new RunCard(newId, targets[0].Tier);
+            if (index >= 0)
+            {
+                Deck[index] = fresh;
+            }
+            else
+            {
+                Deck.Add(fresh);
+            }
+            if (PendingForge != null)
+            {
+                int slot = PendingForge.Candidates.IndexOf(targets[0]);
+                if (slot >= 0)
+                {
+                    PendingForge.Candidates[slot] = fresh;
+                }
+            }
+            Notes.Add("百炼：变换「" + oldName + "」→「" + fresh.CardName + "」");
+        }
+        else if (option.Kind == ForgeOptionKind.Transcribe)
+        {
+            Deck.Add(targets[0].Clone());
+            Notes.Add("百炼：抄录「" + targets[0].CardName + "」");
+        }
+        else if (option.Kind == ForgeOptionKind.Greed)
+        {
+            int fillerId = Rng.Next(2) == 0 ? StarterSlashId : StarterGuardId;
+            RunCard filler = new RunCard(fillerId, CardTier.Copper);
+            filler.NoUpgrade = true;   // 锁死：这张卡永远升不了阶，也合不了
+            Deck.Add(filler);
+            Notes.Add("百炼：贪婪，牌库多了一张「" + CardTierRules.Name(CardTier.Copper) + "阶基础卡」");
+        }
+
+        if (option.Gold > 0)
+        {
+            Earn(option.Gold);
+        }
+
+        PendingForge.Resolved = true;
+        return true;
+    }
+
+    /// <summary>按权重抽一个下标。</summary>
+    private int WeightedPick(List<ForgeOption> options)
+    {
+        int total = 0;
+        for (int i = 0; i < options.Count; i++)
+        {
+            total += options[i].Weight;
+        }
+        if (total <= 0)
+        {
+            return Rng.Next(options.Count);
+        }
+
+        int roll = Rng.Next(total);
+        for (int i = 0; i < options.Count; i++)
+        {
+            roll -= options[i].Weight;
+            if (roll < 0)
+            {
+                return i;
+            }
+        }
+        return options.Count - 1;
+    }
+
+    /// <summary>
+    /// 随机换一张同阶的卡（BaseId 不同即可）。**不限本命** —— 这正是「变换」的价值：
+    /// 有概率抽到别派绝学，等于用一张废卡赌一次。
+    /// </summary>
+    private int RandomSameTierCard(RunCard source)
+    {
+        List<CardConfig> all = ConfigManager.GetAll<CardConfig>();
+        if (all == null)
+        {
+            return 0;
+        }
+
+        int baseId = CardTierRules.BaseIdOf(source.CardId);
+        CardTier tier = source.Tier;
+        List<int> pool = new List<int>();
+        for (int i = 0; i < all.Count; i++)
+        {
+            CardConfig card = all[i];
+            if (card.MinTier != tier)
+            {
+                continue;
+            }
+            if (CardTierRules.BaseIdOf(card.Id) == baseId)
+            {
+                continue;
+            }
+            pool.Add(card.Id);
+        }
+
+        if (pool.Count == 0)
+        {
+            return 0;
+        }
+        return pool[Rng.Next(pool.Count)];
+    }
+
+    /// <summary>贪婪塞的基础卡：劈砍 / 招架（都是不能合成的起始卡）。</summary>
+    private const int StarterSlashId = 143;
+    private const int StarterGuardId = 144;
 
     // —————————————————————— 改单张牌（事件 / 奇遇用）——————————————————————
 

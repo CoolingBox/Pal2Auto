@@ -125,6 +125,12 @@ public class CardConfig : BaseConfig
     /// </summary>
     public int SpawnCardId;
 
+    /// <summary>先发：战斗开始时优先进入起手手牌（百炼台给的）。</summary>
+    public bool PriorityDraw;
+
+    /// <summary>后发：洗牌后沉到牌库底（百炼台给的）。</summary>
+    public bool BottomOfDeck;
+
     /// <summary>关键字（可多个）。JSON 里写 "Exhaust" 或 "Exhaust, Remove"。</summary>
     public CardKeyword Keywords = CardKeyword.None;
 
@@ -149,6 +155,12 @@ public class CardConfig : BaseConfig
     /// Master = 1（小虎的本命）却由敌人打出。
     /// </summary>
     public int Master;
+
+    /// <summary>
+    /// 同族卡的根源 id。展开后每一阶都是独立条目（大刀·铜 = 1、·银 = 1001、·金 = 2001…），
+    /// 合成与卡表分组靠这个字段认「这是同一张卡的哪一阶」。
+    /// </summary>
+    public int BaseId;
 
     /// <summary>
     /// 起步阶（最低能出到几阶）。铜 1 / 银 2 / 金 3 / 钻 4。

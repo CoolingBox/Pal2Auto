@@ -347,7 +347,8 @@ public static class CardPool
             {
                 for (int k = 0; k < excludeIds.Count; k++)
                 {
-                    if (excludeIds[k] == pool[i].Id)
+                    // 按 BaseId 比：同族的不同阶（大刀·铜 / 大刀·银）不该同时出现在一家店
+                    if (excludeIds[k] == CardTierRules.BaseIdOf(pool[i].Id))
                     {
                         used = true;
                         break;

@@ -710,7 +710,10 @@ def build_card(cid, name, master, ctype, cd, values, keywords, tags, icon, desc)
 
 
 def main():
-    old = json.load(open(PATH, encoding="utf-8"))
+    # 卡表可能已经被 expand_card_tiers.py 展开成「每阶一条」——
+    # 这里只取 Id < 1000 的起步版作为原始定义，否则重跑会把展开结果当输入再展一次。
+    all_cards = json.load(open(PATH, encoding="utf-8"))
+    old = [c for c in all_cards if c["Id"] < 1000]
     old_ids = {c["Id"] for c in old}
 
     # NEW 的第 3 列是 master（武学归属）。已存在的卡从这里恢复归属 ——

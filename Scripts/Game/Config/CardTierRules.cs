@@ -55,6 +55,33 @@ public static class CardTierRules
     /// <summary>一天内最多花钱刷新几次（免费那次不算）。</summary>
     public const int RefreshMaxPaid = 5;
 
+    /// <summary>展开后的 id 规则：铜 = 原 id、银 +1000、金 +2000、钻 +3000。</summary>
+    public const int TierIdStep = 1000;
+
+    public static int TierIdOf(int baseId, CardTier tier)
+    {
+        return baseId + TierIdStep * (int)tier;
+    }
+
+    public static int BaseIdOf(int cardId)
+    {
+        return cardId % TierIdStep;
+    }
+
+    public static CardTier TierOfId(int cardId)
+    {
+        int rank = cardId / TierIdStep;
+        if (rank < 0)
+        {
+            rank = 0;
+        }
+        if (rank > 3)
+        {
+            rank = 3;
+        }
+        return (CardTier)rank;
+    }
+
     public static string Name(CardTier tier)
     {
         if (tier == CardTier.Copper)

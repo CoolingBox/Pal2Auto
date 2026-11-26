@@ -51,12 +51,13 @@ def seq(base, card, mt):
     return "/".join(str(x) for x in vals)
 
 
-def effect_line(card, mt):
+def effect_line(card, mt, numeric=True):
     parts = []
-    for key, label in (("Damage", "攻 %d"), ("Spell", "法 %d"), ("Shield", "护 %d"),
-                       ("Heal", "疗 %d"), ("Poison", "毒 %d")):
-        if card.get(key):
-            parts.append(label % card[key] + "（" + seq(card[key], card, mt) + "）")
+    if numeric:
+        for key, label in (("Damage", "攻 %d"), ("Spell", "法 %d"), ("Shield", "护 %d"),
+                           ("Heal", "疗 %d"), ("Poison", "毒 %d")):
+            if card.get(key):
+                parts.append(label % card[key] + "（" + seq(card[key], card, mt) + "）")
     if card.get("Expose"):
         parts.append("破绽 %d（不涨）" % card["Expose"])
     if card.get("MultiCount"):
@@ -78,69 +79,108 @@ def effect_line(card, mt):
     return "、".join(parts) or "—"
 
 
+def stat_line(card):
+    """该阶条目的数值摘要（攻击 / 法术 / 护体 / 治疗 / 毒）。"""
+    parts = []
+    if card.get("Damage"):
+        parts.append("攻 %d" % card["Damage"])
+    if card.get("Spell"):
+        parts.append("法 %d" % card["Spell"])
+    if card.get("Shield"):
+        parts.append("护 %d" % card["Shield"])
+    if card.get("Heal"):
+        parts.append("疗 %d" % card["Heal"])
+    if card.get("Poison"):
+        parts.append("毒 %d" % card["Poison"])
+    return "、".join(parts) or "—"
+
+
 def main():
     cards = json.load(open(SRC, encoding="utf-8"))
 
-    groups = {0: [], 1: [], 2: [], 3: [], 4: []}
+    # 展开后每阶一条，按 BaseId 聚回「一张卡」
+    families = {}
     for c in cards:
-        groups.setdefault(c.get("Master", 0), []).append(c)
+        base = c.get("BaseId", c["Id"] % 1000)
+        families.setdefault(base, {})[c["MinTier"]] = c
 
-    starters = [c for c in cards if c.get("StarterOnly")]
-    counts = {t: 0 for t in TIER_NAME}
-    for c in cards:
-        counts[c.get("MinTier", "Copper")] = counts.get(c.get("MinTier", "Copper"), 0) + 1
+    owners = {0: [], 1: [], 2: [], 3: [], 4: []}
+    for base, tiers in families.items():
+        first = tiers[sorted(tiers, key=lambda t: TIER_ORDER[t])[0]]
+        owners.setdefault(first.get("Master", 0), []).append((base, tiers))
+
+    starters = [(b, t) for o in owners.values() for (b, t) in o
+                if any(c.get("StarterOnly") for c in t.values())]
+    counts = {name: 0 for name in TIER_ORDER}
+    for base, tiers in [(b, t) for o in owners.values() for (b, t) in o]:
+        counts[min(tiers, key=lambda x: TIER_ORDER[x])] += 1
 
     lines = [
         "# 卡表（自动生成）",
         "",
         "> 来源：`Resources/Config/CardConfig.json`，由 `Tools/gen_card_list.py` 导出。",
-        "> 改卡请改 `Tools/gen_cards.py` 再跑一遍，不要手改这份文档。",
-        "> 阶位规则见 `Docs/卡牌等阶与商店.md`：`起步` 是该卡最低能出到的阶。",
-        "> 效果列括号内是「起步阶 → 钻阶」的数值序列；破绽、多重次数、时机秒数、上场数不随阶涨。",
+        "> 改卡请改 `Tools/gen_cards.py`（原始定义）→ `Tools/expand_card_tiers.py`（按阶展开）。",
         "",
-        "共 %d 张。铜起步 %d / 银起步 %d / 金起步 %d / 钻起步 %d。"
-        % (len(cards), counts["Copper"], counts["Silver"], counts["Gold"], counts["Diamond"]),
+        "**配表已按阶展开**：每张卡在它的起步阶及以上各配一条独立条目，数值已经算好写死。",
+        "",
+        "| 阶 | Id 区间 | 例 |",
+        "| --- | --- | --- |",
+        "| 铜 | 1 ~ 283 | 大刀 = 1 |",
+        "| 银 | 1001 ~ 1283 | 大刀·银 = 1001 |",
+        "| 金 | 2001 ~ 2283 | 大刀·金 = 2001 |",
+        "| 钻 | 3001 ~ 3283 | 大刀·钻 = 3001 |",
+        "",
+        "> 表里 `Id` 列是**基础 id**（同族共用）。要改某一阶的数值，去 JSON 里找对应区间的那条。",
+        "> 数值列格式：铜 / 银 / 金 / 钻，缺哪阶显示 `—`。",
+        "",
+        "共 %d 张卡（配表 %d 条）。铜起步 %d / 银起步 %d / 金起步 %d / 钻起步 %d。"
+        % (len(families), len(cards), counts["Copper"], counts["Silver"],
+           counts["Gold"], counts["Diamond"]),
         "",
     ]
 
     if starters:
-        lines += [
-            "## 起始牌组专用（%d 张，不进商店）" % len(starters),
-            "",
-            "| Id | 名称 | 类型 | 冷却 | 效果 | 关键词 | 标签 |",
-            "| --- | --- | --- | --- | --- | --- | --- |",
-        ]
-        for c in starters:
+        lines += ["## 起始牌组专用（%d 张，不进商店）" % len(starters), ""]
+        lines += ["| Id | 名称 | 类型 | 冷却 | 效果 | 关键词 | 标签 |",
+                  "| --- | --- | --- | --- | --- | --- | --- |"]
+        for base, tiers in starters:
+            c = tiers["Copper"]
             lines.append("| %d | %s | %s | %.1f | %s | %s | %s |" % (
-                c["Id"], c["Name"], c["Type"], c["Countdown"],
+                base, c["Name"], c["Type"], c["Countdown"],
                 effect_line(c, 1), c.get("Keywords", "—"), c.get("Tags", "—")))
         lines += [
             "",
             "起始牌组 = **3 劈砍 + 3 招架 + 2 张本命卡**（共 8 张），劈砍 / 招架 不进任何商店与奖励池。",
-            "两张基础卡的数值刻意压到同阶通用件的一半左右（劈砍 2.14 dps 是大刀的 48%，招架 3.00 护/秒是麻布衣的 80%），",
-            "**不带 `Exhaust`**：打出后照常进弃牌堆，每洗一次牌都会转回来 —— 详见 `Docs/起始牌组设计.md`。",
             "",
         ]
 
     for owner in (1, 2, 3, 4, 0):
-        group = groups.get(owner, [])
+        group = owners.get(owner, [])
         if not group:
             continue
         lines += [
             "## %s —— %d 张" % (OWNER_NAME.get(owner, str(owner)), len(group)),
             "",
-            "| Id | 名称 | 类型 | 起步 | 冷却 | 效果（起步 → 钻） | 关键词 | 标签 |",
-            "| --- | --- | --- | --- | --- | --- | --- | --- |",
+            "| Id | 名称 | 类型 | 冷却 | 铜 | 银 | 金 | 钻 | 效果 / 关键词 | 标签 |",
+            "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
         ]
-        for c in group:
-            mt = TIER_ORDER.get(c.get("MinTier", "Copper"), 1)
-            lines.append("| %d | %s | %s | %s | %.1f | %s | %s | %s |" % (
-                c["Id"], c["Name"], c["Type"], TIER_NAME.get(c.get("MinTier", "Copper"), "铜"),
-                c["Countdown"], effect_line(c, mt), c.get("Keywords", "—"), c.get("Tags", "—")))
+        group.sort(key=lambda x: x[0])
+        for base, tiers in group:
+            low = tiers[sorted(tiers, key=lambda t: TIER_ORDER[t])[0]]
+            cells = []
+            for name in ("Copper", "Silver", "Gold", "Diamond"):
+                c = tiers.get(name)
+                cells.append(stat_line(c) if c else "—")
+            cd = low["Countdown"]
+            lines.append("| %d | %s | %s | %.1f | %s | %s | %s | %s | %s | %s |" % (
+                base, low["Name"], low["Type"], cd,
+                cells[0], cells[1], cells[2], cells[3],
+                effect_line(low, TIER_ORDER[low["MinTier"]], False), low.get("Tags", "—")))
         lines.append("")
 
     open(OUT, "w", encoding="utf-8", newline="\n").write("\n".join(lines))
-    print("已导出 %s，共 %d 张（含起始卡 %d 张）" % (OUT, len(cards), len(starters)))
+    print("已导出 %s，共 %d 张卡（配表 %d 条，含起始卡 %d 张）"
+          % (OUT, len(families), len(cards), len(starters)))
     return 0
 
 

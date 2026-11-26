@@ -402,7 +402,44 @@ public sealed class DeckBattle
         }
 
         Shuffle(fighter.DrawPile, new Random());
+        ApplyDrawOrder(fighter);
         return fighter;
+    }
+
+    /// <summary>
+    /// **只在战斗开始的那一次洗牌后**调用（BuildFighter / BuildFighterFromCards 各一次）。
+    /// 作用是把「先发 → 普通 → 后发」做一次稳定分区，保证先发的卡进起手、后发的卡沉底。
+    ///
+    /// 战斗中再洗牌（弃牌堆回收、野球拳塞牌）**不会**重排 —— 先发只管起手那一次，
+    /// 不是「每洗一次都优先」。这条是 2026-11-26 用户明确的口径。
+    /// </summary>
+    private static void ApplyDrawOrder(FighterState fighter)
+    {
+        List<CardConfig> priority = new List<CardConfig>();
+        List<CardConfig> normal = new List<CardConfig>();
+        List<CardConfig> bottom = new List<CardConfig>();
+
+        for (int i = 0; i < fighter.DrawPile.Count; i++)
+        {
+            CardConfig card = fighter.DrawPile[i];
+            if (card.PriorityDraw)
+            {
+                priority.Add(card);
+            }
+            else if (card.BottomOfDeck)
+            {
+                bottom.Add(card);
+            }
+            else
+            {
+                normal.Add(card);
+            }
+        }
+
+        fighter.DrawPile.Clear();
+        fighter.DrawPile.AddRange(priority);
+        fighter.DrawPile.AddRange(normal);
+        fighter.DrawPile.AddRange(bottom);
     }
 
     private static FighterState BuildFighter(string name, string portrait, int maxHp, List<int> cardIds)
@@ -430,6 +467,7 @@ public sealed class DeckBattle
         }
 
         Shuffle(fighter.DrawPile, new Random());
+        ApplyDrawOrder(fighter);
         return fighter;
     }
 

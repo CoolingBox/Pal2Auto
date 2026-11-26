@@ -22,8 +22,25 @@ public enum EnchantType
 public sealed class RunCard
 {
     public int CardId;
-    public CardTier Tier = CardTier.Copper;
     public EnchantType Enchant = EnchantType.None;
+
+    /// <summary>
+    /// 这张牌是几阶 —— **由 CardId 决定**（展开后每阶是独立条目），不再单独存。
+    /// 2026-11-26 之前这里是字段，阶位是运行时的乘数；现在配表已经按阶展开，
+    /// 再存一个 Tier 迟早会和 CardId 对不上（合成、商店、存档三处都要同步，漏一处就是「银卡当铜卡卖」）。
+    /// </summary>
+    public CardTier Tier
+    {
+        get
+        {
+            CardConfig cfg = Config;
+            if (cfg == null)
+            {
+                return CardTier.Copper;
+            }
+            return cfg.MinTier;
+        }
+    }
 
     // —— 实例修正 ——
     // 事件（奇遇、奖励、诅咒）可以直接改「这一张牌」，不能去改 CardConfig
@@ -41,14 +58,34 @@ public sealed class RunCard
     /// <summary>这张卡被事件改过几次，界面用来标一个记号。</summary>
     public int BuffCount;
 
+    // —— 百炼台给的标记 ——
+
+    /// <summary>先发：战斗开始时优先进入起手手牌。</summary>
+    public bool PriorityDraw;
+
+    /// <summary>后发：洗牌后沉到牌库底。</summary>
+    public bool BottomOfDeck;
+
+    /// <summary>多动：多重次数修正（正数 = 多打几次）。</summary>
+    public int BonusMulti;
+
+    /// <summary>数值倍率（快枪 = 0.5）。乘在所有数值上，蓄势不乘。</summary>
+    public float ValueScale = 1f;
+
+    /// <summary>
+    /// 锁死不能升级（贪婪塞进来的基础卡）。它既不能参与「再获得即升阶」，
+    /// 也不能手动 2 合 1 —— 否则这张「负面塞卡」会被后续的自动升阶吃掉，贪婪就没有代价了。
+    /// </summary>
+    public bool NoUpgrade;
+
     public RunCard()
     {
     }
 
+    /// <summary>tier 参数只为兼容旧调用（DevShot / BattlePanel），实际阶位由 CardId 决定。</summary>
     public RunCard(int cardId, CardTier tier)
     {
         CardId = cardId;
-        Tier = tier;
     }
 
     public CardConfig Config
@@ -115,6 +152,7 @@ public sealed class RunCard
                 return 0;
             }
             int value = ApplySharp(CardTierRules.ScaledValue(cfg, cfg.Damage, Tier));
+            value = (int)System.Math.Round(value * ValueScale, System.MidpointRounding.AwayFromZero);
             return System.Math.Max(0, value + BonusDamage);
         }
     }
@@ -129,6 +167,7 @@ public sealed class RunCard
                 return 0;
             }
             int value = ApplySharp(CardTierRules.ScaledValue(cfg, cfg.Spell, Tier));
+            value = (int)System.Math.Round(value * ValueScale, System.MidpointRounding.AwayFromZero);
             return System.Math.Max(0, value + BonusDamage);
         }
     }
@@ -147,6 +186,7 @@ public sealed class RunCard
             {
                 value += 2;
             }
+            value = (int)System.Math.Round(value * ValueScale, System.MidpointRounding.AwayFromZero);
             return System.Math.Max(0, value + BonusShield);
         }
     }
@@ -161,6 +201,7 @@ public sealed class RunCard
                 return 0;
             }
             int value = CardTierRules.ScaledValue(cfg, cfg.Heal, Tier);
+            value = (int)System.Math.Round(value * ValueScale, System.MidpointRounding.AwayFromZero);
             return System.Math.Max(0, value + BonusHeal);
         }
     }
@@ -230,7 +271,6 @@ public sealed class RunCard
     {
         RunCard copy = new RunCard();
         copy.CardId = CardId;
-        copy.Tier = Tier;
         copy.Enchant = Enchant;
         copy.BonusDamage = BonusDamage;
         copy.BonusShield = BonusShield;
@@ -239,6 +279,11 @@ public sealed class RunCard
         copy.BonusExpose = BonusExpose;
         copy.BonusCountdown = BonusCountdown;
         copy.BuffCount = BuffCount;
+        copy.PriorityDraw = PriorityDraw;
+        copy.BottomOfDeck = BottomOfDeck;
+        copy.BonusMulti = BonusMulti;
+        copy.ValueScale = ValueScale;
+        copy.NoUpgrade = NoUpgrade;
         return copy;
     }
 
@@ -272,6 +317,8 @@ public sealed class RunCard
         copy.Master = cfg.Master;
         copy.MinTier = cfg.MinTier;
         copy.StarterOnly = cfg.StarterOnly;
+        copy.PriorityDraw = PriorityDraw;
+        copy.BottomOfDeck = BottomOfDeck;
 
         // 数值走 RunCard 的已缩放属性（阶位 → 附魔），不读 cfg 的原值
         copy.Countdown = Countdown;
@@ -294,12 +341,19 @@ public sealed class RunCard
         copy.FreezeCount = cfg.FreezeCount;
         copy.FreezeTime = cfg.FreezeTime;
         copy.ChargeCount = cfg.ChargeCount;
-        copy.MultiCount = cfg.MultiCount;
+        // MultiCount 的语义是「打几次」：配置里 0 和 1 都表示单次，
+        // 所以「多动 +1」要先把它归一到 1 再加，否则对单次卡 +1 还是 1（等于没加）。
+        int baseMulti = cfg.MultiCount <= 1 ? 1 : cfg.MultiCount;
+        copy.MultiCount = baseMulti + BonusMulti;
+        if (copy.MultiCount < 1)
+        {
+            copy.MultiCount = 1;
+        }
 
         return copy;
     }
 
-    /// <summary>能不能和另一张合成（同名同阶、且未到钻）。</summary>
+    /// <summary>能不能和另一张合成（同名同阶、且未到钻、且没被锁死）。</summary>
     public bool CanMergeWith(RunCard other)
     {
         if (other == null)
