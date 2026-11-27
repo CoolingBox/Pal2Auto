@@ -199,26 +199,26 @@ public static class CardPool
     /// 店铺品类对应的标签。General 返回 null（不限品类）。
     /// 一张卡只要命中其中一个标签就算这家店的货。
     /// </summary>
-    public static string[] KindTags(ShopKind kind)
+    public static string[] KindTags(ShopType kind)
     {
         switch (kind)
         {
-            case ShopKind.Blade:
+            case ShopType.Blade:
                 // 伞（Fan）是兵器，2026-11-25 从防具铺挪过来
                 return new string[] { "Blade", "Sword", "Whip", "Spear", "Fan" };
-            case ShopKind.Armor:
+            case ShopType.Armor:
                 return new string[] { "Armor" };
-            case ShopKind.Pill:
+            case ShopType.Pill:
                 return new string[] { "Pill" };
-            case ShopKind.Talisman:
+            case ShopType.Talisman:
                 return new string[] { "Talisman" };
-            case ShopKind.Gu:
+            case ShopType.Gu:
                 return new string[] { "Gu" };
-            case ShopKind.Charm:
+            case ShopType.Charm:
                 return new string[] { "Charm" };
-            case ShopKind.Dart:
+            case ShopType.Dart:
                 return new string[] { "Dart" };
-            case ShopKind.Skill:
+            case ShopType.Skill:
                 // 武学馆卖的是「家族招式」，不含通用绝学（Ultimate 单独存在于通用卡上）
                 return new string[]
                 {
@@ -231,13 +231,13 @@ public static class CardPool
     }
 
     /// <summary>这张卡是不是这家店的货。</summary>
-    public static bool MatchesKind(CardConfig card, ShopKind kind, int characterId)
+    public static bool MatchesKind(CardConfig card, ShopType kind, int characterId)
     {
         if (card == null)
         {
             return false;
         }
-        if (kind == ShopKind.General)
+        if (kind == ShopType.General)
         {
             // 杂货摊只排除别派本命卡：那类卡买来对当前主角没用
             return card.Master == 0 || card.Master == characterId;
@@ -272,7 +272,7 @@ public static class CardPool
     }
 
     /// <summary>该店该阶的全部货。</summary>
-    public static List<CardConfig> CandidatesForShop(CardTier tier, ShopKind kind, int characterId)
+    public static List<CardConfig> CandidatesForShop(CardTier tier, ShopType kind, int characterId)
     {
         List<CardConfig> result = new List<CardConfig>();
         List<CardConfig> all = All();
@@ -306,7 +306,7 @@ public static class CardPool
     /// 有些品类在某阶本来就没货（比如器物阁最便宜的法宝是银阶的玉菩提），
     /// 这时往上找最近的、有货的阶，价格也按那个阶算，而不是硬塞一张别品类的卡。
     /// </summary>
-    public static CardConfig PickForShop(CardTier tier, ShopKind kind, int characterId,
+    public static CardConfig PickForShop(CardTier tier, ShopType kind, int characterId,
         Random rng, List<int> excludeIds, out CardTier actualTier, CardTier maxTier = CardTier.Diamond)
     {
         int start = (int)tier;

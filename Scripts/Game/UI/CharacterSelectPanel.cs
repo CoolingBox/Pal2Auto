@@ -1,6 +1,6 @@
 // 文件：CharacterSelectPanel.cs
 // 描述：选人界面 —— 四位侠客（王小虎 / 沈欺霜 / 苏媚 / 李忆如），左网格右详情。
-//       确认后只写入 GameFlow.SelectedCharacterId 并给出提示：摆摊界面还没做，不假装能进。
+//       确认后写入 GameFlow.SelectedCharacterId 并进入局内（RunPanel）。
 
 using System.Collections.Generic;
 using Godot;

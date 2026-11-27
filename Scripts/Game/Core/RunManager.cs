@@ -60,14 +60,14 @@ public sealed class RunManager : Singleton<RunManager>
 
         // 百炼台的候选是「Deck 里的引用」，序列化会变成副本、读档后与牌组脱钩。
         // 所以存档时把它摘掉 —— 读档后重回奇遇时辰会重新 roll，玩家不会丢东西。
-        ForgeEvent pending = Current.PendingForge;
-        Current.PendingForge = null;
+        RunEvent pending = Current.PendingEvent;
+        Current.PendingEvent = null;
 
         RunSave save = new RunSave();
         save.Run = Current;
         SaveManager.Save(save);
 
-        Current.PendingForge = pending;
+        Current.PendingEvent = pending;
     }
 
     public bool LoadRun()

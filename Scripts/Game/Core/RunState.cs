@@ -363,7 +363,7 @@ public sealed class RunState
     public int EncounterChoicesPhase;
 
     /// <summary>当前时辰的「百炼台」现场（奇遇时辰打开）。</summary>
-    public ForgeEvent PendingForge;
+    public RunEvent PendingEvent;
 
     /// <summary>今天的免费附魔用掉了没有（淬炉每天一次）。</summary>
     public bool FreeEnchantUsed;
@@ -885,14 +885,14 @@ public sealed class RunState
     // —————————————————————— 百炼台（奇遇）——————————————————————
 
     /// <summary>开一场百炼台：抽 5 张候选 + 3 个随机选项。同一时辰不重复 roll。</summary>
-    public void OpenForgeEvent(int phaseIndex)
+    public void OpenRunEvent(int phaseIndex)
     {
-        if (PendingForge != null && !PendingForge.Resolved && ForgePhaseIndex == phaseIndex)
+        if (PendingEvent != null && !PendingEvent.Resolved && EventPhaseIndex == phaseIndex)
         {
             return;
         }
 
-        ForgeEvent ev = new ForgeEvent();
+        RunEvent ev = new RunEvent();
         List<RunCard> pool = new List<RunCard>(Deck);
         for (int i = 0; i < 5 && pool.Count > 0; i++)
         {
@@ -901,7 +901,7 @@ public sealed class RunState
             pool.RemoveAt(pick);
         }
 
-        List<ForgeOption> options = AllForgeOptions();
+        List<EventOption> options = AllEventOptions();
         for (int i = 0; i < 3 && options.Count > 0; i++)
         {
             int pick = WeightedPick(options);
@@ -909,44 +909,44 @@ public sealed class RunState
             options.RemoveAt(pick);
         }
 
-        PendingForge = ev;
-        ForgePhaseIndex = phaseIndex;
+        PendingEvent = ev;
+        EventPhaseIndex = phaseIndex;
     }
 
     /// <summary>百炼台是在哪个时辰开的（同一时辰不重 roll）。</summary>
-    public int ForgePhaseIndex = -1;
+    public int EventPhaseIndex = -1;
 
-    private static List<ForgeOption> AllForgeOptions()
+    private static List<EventOption> AllEventOptions()
     {
-        List<ForgeOption> list = new List<ForgeOption>();
+        List<EventOption> list = new List<EventOption>();
 
-        // 权重口径（2026-11-26）：「移除牌库 / 无代价提速 / 合成」本身是净赚，
+        // 权重口径（2026-11-26）：「移除牌组 / 无代价提速 / 合成」本身是净赚，
         // 这类选项权重压到 4~5，否则每次开炉都摆到脸上，百炼台就退化成「白嫖台」。
-        list.Add(MakeOption(ForgeOptionKind.Merge, "合成", "选 2 张：数值与蓄势全部相加，合成一张", 2, 0, 4));
-        list.Add(MakeOption(ForgeOptionKind.Exile, "放逐", "选 1 张：移出牌库，但气血上限 -10", 1, 0, 4));
-        list.Add(MakeOption(ForgeOptionKind.Whet, "磨砺", "选 1 张：蓄势 -0.5 秒，不牺牲数值", 1, 0, 5));
-        list.Add(MakeOption(ForgeOptionKind.Vitality, "换命", "选 1 张：移出牌库，气血上限 +15", 1, 0, 5));
+        list.Add(MakeOption(EventOptionType.Merge, "合成", "选 2 张：数值与蓄势全部相加，合成一张", 2, 0, 4));
+        list.Add(MakeOption(EventOptionType.Exile, "放逐", "选 1 张：移出牌组，但气血上限 -10", 1, 0, 4));
+        list.Add(MakeOption(EventOptionType.Whet, "磨砺", "选 1 张：蓄势 -0.5 秒，不牺牲数值", 1, 0, 5));
+        list.Add(MakeOption(EventOptionType.Vitality, "换命", "选 1 张：移出牌组，气血上限 +15", 1, 0, 5));
 
-        list.Add(MakeOption(ForgeOptionKind.Transmute, "变换", "选 1 张：随机变成另一张同阶卡（可能抽到别派绝学）", 1, 0, 8));
-        list.Add(MakeOption(ForgeOptionKind.Sharp, "锋利", "选 1 张：伤害 +2", 1, 0));
-        list.Add(MakeOption(ForgeOptionKind.Quench, "淬甲", "选 1 张：护体 / 治疗 +2", 1, 0));
-        list.Add(MakeOption(ForgeOptionKind.Priority, "先发", "选 1 张：战斗开始时优先上手", 1, 0));
-        list.Add(MakeOption(ForgeOptionKind.Bottom, "后发", "选 1 张：洗牌后沉到牌库底", 1, 0));
-        list.Add(MakeOption(ForgeOptionKind.Multi, "多动", "选 1 张：多重 +1，蓄势 +1 秒", 1, 0));
-        list.Add(MakeOption(ForgeOptionKind.QuickDraw, "快枪", "选 1 张：蓄势 -1 秒，但数值减半", 1, 0));
+        list.Add(MakeOption(EventOptionType.Transmute, "变换", "选 1 张：随机变成另一张同阶卡（可能抽到别派绝学）", 1, 0, 8));
+        list.Add(MakeOption(EventOptionType.Sharp, "锋利", "选 1 张：伤害 +2", 1, 0));
+        list.Add(MakeOption(EventOptionType.Quench, "淬甲", "选 1 张：护体 / 治疗 +2", 1, 0));
+        list.Add(MakeOption(EventOptionType.Priority, "先发", "选 1 张：战斗开始时优先上手", 1, 0));
+        list.Add(MakeOption(EventOptionType.Bottom, "后发", "选 1 张：洗牌后沉到抽牌堆底", 1, 0));
+        list.Add(MakeOption(EventOptionType.Multi, "多动", "选 1 张：多重 +1，蓄势 +1 秒", 1, 0));
+        list.Add(MakeOption(EventOptionType.QuickDraw, "快枪", "选 1 张：蓄势 -1 秒，但数值减半", 1, 0));
         // 定价模型（2026-11-26）：塞一张永久废卡的代价 + 占掉一个选项位的机会成本。
         //   废卡稀释牌组 ≈ 20~40 两（一张铜卡市价 20，但多一张废卡要摊薄关键卡）；
         //   选项位的替代价值 ≈ 40~60 两（合成省的删牌费 60、锋利 +2 伤折算 20）。
         //   合计 60~100，取 80：这是「用牌组健康换现钱」的交易，不能是「塞垃圾还倒赚」。
-        list.Add(MakeOption(ForgeOptionKind.Greed, "贪婪", "牌库塞一张铜阶基础卡（永不升级），另得 80 银两", 0, 80));
-        list.Add(MakeOption(ForgeOptionKind.Transcribe, "抄录", "选 1 张：复制一张同阶同名卡进牌库", 1, 0));
+        list.Add(MakeOption(EventOptionType.Greed, "贪婪", "牌组塞一张铜阶基础卡（永不升级），另得 80 银两", 0, 80));
+        list.Add(MakeOption(EventOptionType.Transcribe, "抄录", "选 1 张：复制一张同阶同名卡进牌组", 1, 0));
         return list;
     }
 
-    private static ForgeOption MakeOption(ForgeOptionKind kind, string name, string desc,
+    private static EventOption MakeOption(EventOptionType kind, string name, string desc,
         int targets, int gold, int weight = 10)
     {
-        ForgeOption option = new ForgeOption();
+        EventOption option = new EventOption();
         option.Kind = kind;
         option.Name = name;
         option.Desc = desc;
@@ -957,9 +957,9 @@ public sealed class RunState
     }
 
     /// <summary>结算一个百炼台选项。targets 是玩家点选的牌（可以来自候选，也可以来自牌组）。</summary>
-    public bool ApplyForgeOption(ForgeOption option, List<RunCard> targets)
+    public bool ApplyEventOption(EventOption option, List<RunCard> targets)
     {
-        if (option == null || PendingForge == null || PendingForge.Resolved)
+        if (option == null || PendingEvent == null || PendingEvent.Resolved)
         {
             return false;
         }
@@ -972,7 +972,7 @@ public sealed class RunState
             return false;
         }
 
-        if (option.Kind == ForgeOptionKind.Merge)
+        if (option.Kind == EventOptionType.Merge)
         {
             RunCard first = targets[0];
             RunCard second = targets[1];
@@ -992,39 +992,39 @@ public sealed class RunState
             Notes.Add("百炼：合成「" + first.CardName + "」+" +
                 second.CardName + "（蓄势 +" + second.Countdown.ToString("0.0") + " 秒）");
         }
-        else if (option.Kind == ForgeOptionKind.Priority)
+        else if (option.Kind == EventOptionType.Priority)
         {
             targets[0].PriorityDraw = true;
             targets[0].BuffCount++;
             Notes.Add("百炼：先发「" + targets[0].CardName + "」");
         }
-        else if (option.Kind == ForgeOptionKind.Bottom)
+        else if (option.Kind == EventOptionType.Bottom)
         {
             targets[0].BottomOfDeck = true;
             targets[0].BuffCount++;
             Notes.Add("百炼：后发「" + targets[0].CardName + "」");
         }
-        else if (option.Kind == ForgeOptionKind.Sharp)
+        else if (option.Kind == EventOptionType.Sharp)
         {
             targets[0].BonusDamage += 2;
             targets[0].BuffCount++;
             Notes.Add("百炼：锋利「" + targets[0].CardName + "」伤害 +2");
         }
-        else if (option.Kind == ForgeOptionKind.QuickDraw)
+        else if (option.Kind == EventOptionType.QuickDraw)
         {
             targets[0].ValueScale *= 0.5f;
             targets[0].BonusCountdown -= 1f;
             targets[0].BuffCount++;
             Notes.Add("百炼：快枪「" + targets[0].CardName + "」蓄势 -1 秒，数值减半");
         }
-        else if (option.Kind == ForgeOptionKind.Multi)
+        else if (option.Kind == EventOptionType.Multi)
         {
             targets[0].BonusMulti += 1;
             targets[0].BonusCountdown += 1f;
             targets[0].BuffCount++;
             Notes.Add("百炼：多动「" + targets[0].CardName + "」多重 +1，蓄势 +1 秒");
         }
-        else if (option.Kind == ForgeOptionKind.Exile)
+        else if (option.Kind == EventOptionType.Exile)
         {
             // 删牌本身是奖励（集市删一张要 60 两），所以这里必须挂代价
             Deck.Remove(targets[0]);
@@ -1035,26 +1035,26 @@ public sealed class RunState
             }
             Notes.Add("百炼：放逐「" + targets[0].CardName + "」，气血上限 -10");
         }
-        else if (option.Kind == ForgeOptionKind.Quench)
+        else if (option.Kind == EventOptionType.Quench)
         {
             targets[0].BonusShield += 2;
             targets[0].BonusHeal += 2;
             targets[0].BuffCount++;
             Notes.Add("百炼：淬甲「" + targets[0].CardName + "」护体/治疗 +2");
         }
-        else if (option.Kind == ForgeOptionKind.Whet)
+        else if (option.Kind == EventOptionType.Whet)
         {
             targets[0].BonusCountdown -= 0.5f;
             targets[0].BuffCount++;
             Notes.Add("百炼：磨砺「" + targets[0].CardName + "」蓄势 -0.5 秒");
         }
-        else if (option.Kind == ForgeOptionKind.Vitality)
+        else if (option.Kind == EventOptionType.Vitality)
         {
             Deck.Remove(targets[0]);
             BonusHp += 15;
             Notes.Add("百炼：换命「" + targets[0].CardName + "」气血上限 +15");
         }
-        else if (option.Kind == ForgeOptionKind.Transmute)
+        else if (option.Kind == EventOptionType.Transmute)
         {
             int newId = RandomSameTierCard(targets[0]);
             if (newId <= 0)
@@ -1072,28 +1072,28 @@ public sealed class RunState
             {
                 Deck.Add(fresh);
             }
-            if (PendingForge != null)
+            if (PendingEvent != null)
             {
-                int slot = PendingForge.Candidates.IndexOf(targets[0]);
+                int slot = PendingEvent.Candidates.IndexOf(targets[0]);
                 if (slot >= 0)
                 {
-                    PendingForge.Candidates[slot] = fresh;
+                    PendingEvent.Candidates[slot] = fresh;
                 }
             }
             Notes.Add("百炼：变换「" + oldName + "」→「" + fresh.CardName + "」");
         }
-        else if (option.Kind == ForgeOptionKind.Transcribe)
+        else if (option.Kind == EventOptionType.Transcribe)
         {
             Deck.Add(targets[0].Clone());
             Notes.Add("百炼：抄录「" + targets[0].CardName + "」");
         }
-        else if (option.Kind == ForgeOptionKind.Greed)
+        else if (option.Kind == EventOptionType.Greed)
         {
             int fillerId = Rng.Next(2) == 0 ? StarterSlashId : StarterGuardId;
             RunCard filler = new RunCard(fillerId, CardTier.Copper);
             filler.NoUpgrade = true;   // 锁死：这张卡永远升不了阶，也合不了
             Deck.Add(filler);
-            Notes.Add("百炼：贪婪，牌库多了一张「" + filler.CardName + "」（永不升级），+" +
+            Notes.Add("百炼：贪婪，牌组多了一张「" + filler.CardName + "」（永不升级），+" +
                 option.Gold + " 银两");
         }
 
@@ -1102,12 +1102,12 @@ public sealed class RunState
             Earn(option.Gold);
         }
 
-        PendingForge.Resolved = true;
+        PendingEvent.Resolved = true;
         return true;
     }
 
     /// <summary>按权重抽一个下标。</summary>
-    private int WeightedPick(List<ForgeOption> options)
+    private int WeightedPick(List<EventOption> options)
     {
         int total = 0;
         for (int i = 0; i < options.Count; i++)
@@ -1177,30 +1177,30 @@ public sealed class RunState
     /// 给牌组里的某一张牌加永久修正。**不动 CardConfig** ——
     /// 那是全局配置，改一张等于改所有同名卡，而且跟着存档走不了。
     /// </summary>
-    public void BuffCard(RunCard card, CardStat stat, int amount)
+    public void BuffCard(RunCard card, CardStatType stat, int amount)
     {
         if (card == null || amount == 0)
         {
             return;
         }
 
-        if (stat == CardStat.Damage)
+        if (stat == CardStatType.Damage)
         {
             card.BonusDamage += amount;
         }
-        else if (stat == CardStat.Shield)
+        else if (stat == CardStatType.Shield)
         {
             card.BonusShield += amount;
         }
-        else if (stat == CardStat.Heal)
+        else if (stat == CardStatType.Heal)
         {
             card.BonusHeal += amount;
         }
-        else if (stat == CardStat.Poison)
+        else if (stat == CardStatType.Poison)
         {
             card.BonusPoison += amount;
         }
-        else if (stat == CardStat.Expose)
+        else if (stat == CardStatType.Expose)
         {
             card.BonusExpose += amount;
         }
@@ -1221,21 +1221,21 @@ public sealed class RunState
         Notes.Add("「" + card.CardName + "」蓄势 " + seconds.ToString("+0.0;-0.0") + " 秒");
     }
 
-    private static string StatName(CardStat stat)
+    private static string StatName(CardStatType stat)
     {
-        if (stat == CardStat.Damage)
+        if (stat == CardStatType.Damage)
         {
             return "伤害";
         }
-        if (stat == CardStat.Shield)
+        if (stat == CardStatType.Shield)
         {
             return "护体";
         }
-        if (stat == CardStat.Heal)
+        if (stat == CardStatType.Heal)
         {
             return "治疗";
         }
-        if (stat == CardStat.Poison)
+        if (stat == CardStatType.Poison)
         {
             return "中毒";
         }
@@ -1248,20 +1248,20 @@ public sealed class RunState
     public List<LevelReward> PickRewards(int count)
     {
         List<LevelReward> result = new List<LevelReward>();
-        List<LevelRewardKind> pool = new List<LevelRewardKind>();
-        pool.Add(LevelRewardKind.Bone);
-        pool.Add(LevelRewardKind.Bone);
-        pool.Add(LevelRewardKind.Bone);
-        pool.Add(LevelRewardKind.Coin);
-        pool.Add(LevelRewardKind.Coin);
-        pool.Add(LevelRewardKind.Wage);
-        pool.Add(LevelRewardKind.Scroll);
-        pool.Add(LevelRewardKind.Refresh);
+        List<LevelRewardType> pool = new List<LevelRewardType>();
+        pool.Add(LevelRewardType.Bone);
+        pool.Add(LevelRewardType.Bone);
+        pool.Add(LevelRewardType.Bone);
+        pool.Add(LevelRewardType.Coin);
+        pool.Add(LevelRewardType.Coin);
+        pool.Add(LevelRewardType.Wage);
+        pool.Add(LevelRewardType.Scroll);
+        pool.Add(LevelRewardType.Refresh);
 
         while (result.Count < count && pool.Count > 0)
         {
             int index = Rng.Next(pool.Count);
-            LevelRewardKind kind = pool[index];
+            LevelRewardType kind = pool[index];
 
             // 同一个三选一里不出现两张一样的
             for (int i = pool.Count - 1; i >= 0; i--)
@@ -1278,26 +1278,26 @@ public sealed class RunState
         return result;
     }
 
-    private LevelReward MakeReward(LevelRewardKind kind)
+    private LevelReward MakeReward(LevelRewardType kind)
     {
         LevelReward reward = new LevelReward();
         reward.Kind = kind;
-        if (kind == LevelRewardKind.Bone)
+        if (kind == LevelRewardType.Bone)
         {
             reward.Name = "铁骨";
             reward.Desc = "气血上限 +" + BoneBonusHp;
         }
-        else if (kind == LevelRewardKind.Coin)
+        else if (kind == LevelRewardType.Coin)
         {
             reward.Name = "盘缠";
             reward.Desc = "银两 +" + CoinBonusGold;
         }
-        else if (kind == LevelRewardKind.Wage)
+        else if (kind == LevelRewardType.Wage)
         {
             reward.Name = "月俸";
             reward.Desc = "每日俸禄 +" + WageBonusPerPick;
         }
-        else if (kind == LevelRewardKind.Scroll)
+        else if (kind == LevelRewardType.Scroll)
         {
             reward.Name = "抄本";
             reward.Desc = "一张本命铜卡入组";
@@ -1318,27 +1318,27 @@ public sealed class RunState
             return;
         }
 
-        if (reward.Kind == LevelRewardKind.Bone)
+        if (reward.Kind == LevelRewardType.Bone)
         {
             BonusHp += BoneBonusHp;
             Notes.Add("选「铁骨」：气血上限 → " + MaxHp);
         }
-        else if (reward.Kind == LevelRewardKind.Coin)
+        else if (reward.Kind == LevelRewardType.Coin)
         {
             Gold += CoinBonusGold;
             Notes.Add("选「盘缠」：银两 +" + CoinBonusGold);
         }
-        else if (reward.Kind == LevelRewardKind.Wage)
+        else if (reward.Kind == LevelRewardType.Wage)
         {
             WageBonus += WageBonusPerPick;
             Notes.Add("选「月俸」：日俸 → " + DaySalary);
         }
-        else if (reward.Kind == LevelRewardKind.Refresh)
+        else if (reward.Kind == LevelRewardType.Refresh)
         {
             FreeRefreshBonus++;
             Notes.Add("选「门路」：每日免费刷新 → " + FreeRefreshPerDay);
         }
-        else if (reward.Kind == LevelRewardKind.Scroll)
+        else if (reward.Kind == LevelRewardType.Scroll)
         {
             int cardId = PickOwnCopperCard();
             if (cardId > 0)

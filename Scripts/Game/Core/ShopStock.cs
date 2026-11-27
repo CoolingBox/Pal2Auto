@@ -17,7 +17,7 @@ using System.Collections.Generic;
 using TinyFramework;
 
 /// <summary>店铺品类。决定这家店卖哪一类的卡。</summary>
-public enum ShopKind
+public enum ShopType
 {
     General,   // 杂货摊：不限品类，纯按当天阶位概率
     Blade,     // 兵器铺：刀、剑、鞭、枪
@@ -50,7 +50,7 @@ public sealed class ShopStock
     /// <summary>货架格数。2026-11-25 从 3 提到 4：卡池涨到 278 之后，3 格太难凑齐同名卡做 2 合 1。</summary>
     public const int SlotCount = 4;
 
-    public ShopKind Kind = ShopKind.General;
+    public ShopType Kind = ShopType.General;
     public ShopGrade Grade = ShopGrade.Common;
 
     public List<ShopOffer> Offers = new List<ShopOffer>();
@@ -141,7 +141,7 @@ public sealed class ShopStock
                 continue;
             }
 
-            // 天数上限：第 2 天就算牌库里有金大刀，货架也不能摆金（DayWeights 里金的权重是 0）
+            // 天数上限：第 2 天就算牌组里有金大刀，货架也不能摆金（DayWeights 里金的权重是 0）
             CardTier cap = MaxTierToday();
             CardTier target = best;
             if ((int)target > (int)cap)
@@ -207,43 +207,43 @@ public sealed class ShopStock
     // —————————————————————— 品类与档次 ——————————————————————
 
     /// <summary>品类概率。武学馆只占一成多 —— 本命卡池小，天天开就腻了。</summary>
-    private static ShopKind RollKind(Random rng)
+    private static ShopType RollKind(Random rng)
     {
         int roll = rng.Next(1000);
 
         if (roll < 60)
         {
-            return ShopKind.General;
+            return ShopType.General;
         }
         if (roll < 180)
         {
-            return ShopKind.Blade;
+            return ShopType.Blade;
         }
         if (roll < 300)
         {
-            return ShopKind.Armor;
+            return ShopType.Armor;
         }
         if (roll < 420)
         {
-            return ShopKind.Pill;
+            return ShopType.Pill;
         }
         if (roll < 540)
         {
-            return ShopKind.Talisman;
+            return ShopType.Talisman;
         }
         if (roll < 640)
         {
-            return ShopKind.Gu;
+            return ShopType.Gu;
         }
         if (roll < 760)
         {
-            return ShopKind.Charm;
+            return ShopType.Charm;
         }
         if (roll < 860)
         {
-            return ShopKind.Dart;
+            return ShopType.Dart;
         }
-        return ShopKind.Skill;
+        return ShopType.Skill;
     }
 
     /// <summary>
@@ -425,25 +425,25 @@ public sealed class ShopStock
         }
     }
 
-    public static string KindName(ShopKind kind)
+    public static string KindName(ShopType kind)
     {
         switch (kind)
         {
-            case ShopKind.Blade:
+            case ShopType.Blade:
                 return "兵器铺";
-            case ShopKind.Armor:
+            case ShopType.Armor:
                 return "防具铺";
-            case ShopKind.Pill:
+            case ShopType.Pill:
                 return "药铺";
-            case ShopKind.Talisman:
+            case ShopType.Talisman:
                 return "符咒铺";
-            case ShopKind.Gu:
+            case ShopType.Gu:
                 return "蛊铺";
-            case ShopKind.Charm:
+            case ShopType.Charm:
                 return "器物阁";
-            case ShopKind.Dart:
+            case ShopType.Dart:
                 return "暗器铺";
-            case ShopKind.Skill:
+            case ShopType.Skill:
                 return "武学馆";
             default:
                 return "杂货摊";
@@ -463,25 +463,25 @@ public sealed class ShopStock
         }
     }
 
-    public static string KindMotto(ShopKind kind)
+    public static string KindMotto(ShopType kind)
     {
         switch (kind)
         {
-            case ShopKind.Blade:
+            case ShopType.Blade:
                 return "刀剑鞭枪，一应俱全";
-            case ShopKind.Armor:
+            case ShopType.Armor:
                 return "甲胄伞盖，挡得住刀";
-            case ShopKind.Pill:
+            case ShopType.Pill:
                 return "丹药济世，也救急";
-            case ShopKind.Talisman:
+            case ShopType.Talisman:
                 return "符纸朱砂，专克邪祟";
-            case ShopKind.Gu:
+            case ShopType.Gu:
                 return "苗疆蛊虫，勿轻触";
-            case ShopKind.Charm:
+            case ShopType.Charm:
                 return "法宝奇珍，看缘法";
-            case ShopKind.Dart:
+            case ShopType.Dart:
                 return "镖针袖箭，见血封喉";
-            case ShopKind.Skill:
+            case ShopType.Skill:
                 return "本门武学，只传有缘人";
             default:
                 return "什么都有一点";

@@ -95,7 +95,7 @@ public static class DevShot
             }
             if (all[i] == "--resetdeck")
             {
-                // 「移除」关键字会永久扣牌库，调试时用它复原
+                // 「移除」关键字会永久扣牌组，调试时用它复原
                 DeckStore.ResetAll();
                 GD.Print("RESETDECK 已清空永久移除记录");
             }
@@ -362,7 +362,7 @@ public static class DevShot
             {
                 RunCard card = run.Current.Deck[i];
                 int before = card.Damage;
-                run.Current.BuffCard(card, CardStat.Damage, buffDamage);
+                run.Current.BuffCard(card, CardStatType.Damage, buffDamage);
                 GD.Print("BUFF " + card.CardName + " 伤害 " + before + " → " + card.Damage);
             }
         }
@@ -383,7 +383,7 @@ public static class DevShot
             {
                 st.Day = probeDay;
             }
-            // 塞一张金大刀：验「牌库有金卡，但当天上限是银」时货架只到银
+            // 塞一张金大刀：验「牌组有金卡，但当天上限是银」时货架只到银
             st.AddCard(new RunCard(2001, CardTier.Gold));
             st.Shop.Open(st.Day, st.CharacterId, st.Rng, st.Deck);
             GD.Print("ALIGN 第 " + st.Day + " 天（上限 " + st.Shop.MaxTierToday() + "），牌组已有大刀·金");
@@ -487,24 +487,24 @@ public static class DevShot
             return;
         }
 
-        // --forgestat=N 连开 N 次百炼台，统计每个选项的出现频率（验权重）
-        int forgeStat = ReadIntArg("--forgestat=", 0);
-        if (forgeStat > 0)
+        // --eventstat=N 连开 N 次百炼台，统计每个选项的出现频率（验权重）
+        int eventStat = ReadIntArg("--eventstat=", 0);
+        if (eventStat > 0)
         {
             RunState st = run.Current;
-            Dictionary<ForgeOptionKind, int> counter = new Dictionary<ForgeOptionKind, int>();
-            for (int i = 0; i < forgeStat; i++)
+            Dictionary<EventOptionType, int> counter = new Dictionary<EventOptionType, int>();
+            for (int i = 0; i < eventStat; i++)
             {
-                st.PendingForge = null;
-                st.ForgePhaseIndex = -1;
-                st.OpenForgeEvent(0);
-                if (st.PendingForge == null)
+                st.PendingEvent = null;
+                st.EventPhaseIndex = -1;
+                st.OpenRunEvent(0);
+                if (st.PendingEvent == null)
                 {
                     continue;
                 }
-                for (int k = 0; k < st.PendingForge.Options.Count; k++)
+                for (int k = 0; k < st.PendingEvent.Options.Count; k++)
                 {
-                    ForgeOptionKind kind = st.PendingForge.Options[k].Kind;
+                    EventOptionType kind = st.PendingEvent.Options[k].Kind;
                     if (!counter.ContainsKey(kind))
                     {
                         counter[kind] = 0;
@@ -513,25 +513,25 @@ public static class DevShot
                 }
             }
 
-            GD.Print("FORGESTAT 共 " + forgeStat + " 次，每次 3 个选项，合计 " + (forgeStat * 3));
-            foreach (KeyValuePair<ForgeOptionKind, int> pair in counter)
+            GD.Print("FORGESTAT 共 " + eventStat + " 次，每次 3 个选项，合计 " + (eventStat * 3));
+            foreach (KeyValuePair<EventOptionType, int> pair in counter)
             {
                 GD.Print("FORGESTAT " + pair.Key + " " + pair.Value + " 次（" +
-                    (100f * pair.Value / (forgeStat * 3f)).ToString("0.0") + "%）");
+                    (100f * pair.Value / (eventStat * 3f)).ToString("0.0") + "%）");
             }
             System.Console.Out.Flush();
             host.GetTree().Quit(0);
             return;
         }
 
-        // --forgeact=merge|sharp|quick|multi 直接跑一次百炼台结算（不依赖 UI），验数值改动
-        string forgeAct = ReadStringArg("--forgeact=", "");
-        if (forgeAct.Length > 0)
+        // --eventact=merge|sharp|quick|multi 直接跑一次百炼台结算（不依赖 UI），验数值改动
+        string eventAct = ReadStringArg("--eventact=", "");
+        if (eventAct.Length > 0)
         {
             RunState st = run.Current;
-            st.OpenForgeEvent(0);
-            ForgeEvent forge = st.PendingForge;
-            GD.Print("FORGE 牌库 " + st.Deck.Count + " 张，候选 " + (forge == null ? -1 : forge.Candidates.Count));
+            st.OpenRunEvent(0);
+            RunEvent forge = st.PendingEvent;
+            GD.Print("EVENT 牌组 " + st.Deck.Count + " 张，候选 " + (forge == null ? -1 : forge.Candidates.Count));
 
             if (forge != null && forge.Candidates.Count >= 2)
             {
@@ -540,38 +540,38 @@ public static class DevShot
                 GD.Print("FORGE 前 " + a.CardName + " 攻 " + a.Damage + " 蓄 " + a.Countdown.ToString("0.0"));
                 GD.Print("FORGE 前 " + b.CardName + " 攻 " + b.Damage + " 蓄 " + b.Countdown.ToString("0.0"));
 
-                ForgeOption opt = new ForgeOption();
-                opt.Kind = ForgeOptionKind.Merge;
+                EventOption opt = new EventOption();
+                opt.Kind = EventOptionType.Merge;
                 opt.TargetCount = 2;
-                if (forgeAct == "sharp")
+                if (eventAct == "sharp")
                 {
-                    opt.Kind = ForgeOptionKind.Sharp;
+                    opt.Kind = EventOptionType.Sharp;
                     opt.TargetCount = 1;
                 }
-                else if (forgeAct == "quick")
+                else if (eventAct == "quick")
                 {
-                    opt.Kind = ForgeOptionKind.QuickDraw;
+                    opt.Kind = EventOptionType.QuickDraw;
                     opt.TargetCount = 1;
                 }
-                else if (forgeAct == "multi")
+                else if (eventAct == "multi")
                 {
-                    opt.Kind = ForgeOptionKind.Multi;
+                    opt.Kind = EventOptionType.Multi;
                     opt.TargetCount = 1;
                 }
-                else if (forgeAct == "transmute")
+                else if (eventAct == "transmute")
                 {
-                    opt.Kind = ForgeOptionKind.Transmute;
+                    opt.Kind = EventOptionType.Transmute;
                     opt.TargetCount = 1;
                 }
-                else if (forgeAct == "greed")
+                else if (eventAct == "greed")
                 {
-                    opt.Kind = ForgeOptionKind.Greed;
+                    opt.Kind = EventOptionType.Greed;
                     opt.TargetCount = 0;
                     opt.Gold = 80;
                 }
-                else if (forgeAct == "exile")
+                else if (eventAct == "exile")
                 {
-                    opt.Kind = ForgeOptionKind.Exile;
+                    opt.Kind = EventOptionType.Exile;
                     opt.TargetCount = 1;
                 }
 
@@ -582,9 +582,9 @@ public static class DevShot
                     targets.Add(b);
                 }
 
-                bool ok = st.ApplyForgeOption(opt, targets);
+                bool ok = st.ApplyEventOption(opt, targets);
                 string lastNote = st.Notes.Count > 0 ? st.Notes[st.Notes.Count - 1] : "（无记录）";
-                GD.Print("FORGE " + forgeAct + " 成功=" + ok + "，牌库 " + st.Deck.Count + " 张");
+                GD.Print("FORGE " + eventAct + " 成功=" + ok + "，牌组 " + st.Deck.Count + " 张");
                 GD.Print("FORGE 记录：" + lastNote + "（现有银两 " + st.Gold + "）");
                 if (ok && st.Deck.Count > 0)
                 {

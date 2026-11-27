@@ -22,10 +22,10 @@ public enum CardKeyword
 {
     None = 0,
 
-    /// <summary>消耗：打完进「消耗堆」，本场不再回到牌库。</summary>
+    /// <summary>消耗：打完进「消耗堆」，本场不再回到抽牌堆。</summary>
     Exhaust = 1,
 
-    /// <summary>移除：打完从牌库永久去掉（存进 DeckProgress，下一场也不会出现）。</summary>
+    /// <summary>移除：打完从牌组永久去掉（存进 DeckProgress，下一场也不会出现）。</summary>
     Remove = 2,
 
     /// <summary>贯穿：无视护体，直接扣气血。</summary>
@@ -128,7 +128,7 @@ public class CardConfig : BaseConfig
     /// <summary>先发：战斗开始时优先进入起手手牌（百炼台给的）。</summary>
     public bool PriorityDraw;
 
-    /// <summary>后发：洗牌后沉到牌库底（百炼台给的）。</summary>
+    /// <summary>后发：洗牌后沉到抽牌堆底（百炼台给的）。</summary>
     public bool BottomOfDeck;
 
     /// <summary>

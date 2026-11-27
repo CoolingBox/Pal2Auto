@@ -9,7 +9,7 @@
 //         Shop        → 四格货架（按阶定价）+ 刷新 + 离开
 //         Encounter   → 敌人信息 + 开战
 //         Nemesis     → 同上，但输了扣声望
-//         Event/Forge → 尚未实装，只能离开（不假装做了）
+//         Event → 百炼台（RunEvent），Forge → 淬炉（Enchant）
 //   底栏：牌组张数 · 可合成组数 · 一句提示
 //
 // 规则来源：Docs/局内流程设计.md、Docs/卡牌等阶与商店.md。
@@ -39,7 +39,7 @@ public class RunPanel : BasePanel
     private int _shopMode;
 
     /// <summary>百炼台里已经点选的牌（最多 2 张）。</summary>
-    private readonly List<RunCard> _forgePicked = new List<RunCard>();
+    private readonly List<RunCard> _eventPicked = new List<RunCard>();
 
     /// <summary>淬炉里点选的牌（附魔对象）。</summary>
     private RunCard _enchantPicked;
@@ -261,11 +261,11 @@ public class RunPanel : BasePanel
         }
         else if (phase.Type == PhaseType.Event)
         {
-            BuildForgeEvent(state, phase);
+            BuildRunEvent(state, phase);
         }
         else if (phase.Type == PhaseType.Forge)
         {
-            BuildForgeShop(state, phase);
+            BuildForgePanel(state, phase);
         }
         else if (phase.Type == PhaseType.Encounter || phase.Type == PhaseType.Nemesis)
         {
@@ -869,11 +869,11 @@ public class RunPanel : BasePanel
     // —————————————————————— 占位与结算 ——————————————————————
 
     /// <summary>百炼台：上方 5 张候选（点选），下方 3 个选项。</summary>
-    private void BuildForgeEvent(RunState state, DayPhase phase)
+    private void BuildRunEvent(RunState state, DayPhase phase)
     {
-        state.OpenForgeEvent(phase.Index);
-        ForgeEvent forge = state.PendingForge;
-        if (forge == null)
+        state.OpenRunEvent(phase.Index);
+        RunEvent runEvent = state.PendingEvent;
+        if (runEvent == null)
         {
             BuildPlaceholder(phase);
             return;
@@ -884,17 +884,17 @@ public class RunPanel : BasePanel
         _body.AddChild(title);
 
         Label hint = UiKit.MakeLabel(
-            forge.Resolved
+            runEvent.Resolved
                 ? "炉火已熄，这个时辰过去了"
                 : "先点牌、再点下方选项（合成要选两张）",
             12, UiKit.PaperDim);
         UiKit.Place(hint, 0f, 48f, W, 22f, HorizontalAlignment.Center);
         _body.AddChild(hint);
 
-        for (int i = 0; i < forge.Candidates.Count; i++)
+        for (int i = 0; i < runEvent.Candidates.Count; i++)
         {
-            RunCard card = forge.Candidates[i];
-            bool picked = _forgePicked.Contains(card);
+            RunCard card = runEvent.Candidates[i];
+            bool picked = _eventPicked.Contains(card);
             float x = 135f + i * 140f;
 
             Panel frame = new Panel();
@@ -913,7 +913,7 @@ public class RunPanel : BasePanel
             UiKit.Place(tier, 0f, 30f, 130f, 18f, HorizontalAlignment.Center);
             frame.AddChild(tier);
 
-            Label stat = UiKit.MakeLabel(CardStatLine(card), 11, UiKit.PaperDim);
+            Label stat = UiKit.MakeLabel(CardStatTypeLine(card), 11, UiKit.PaperDim);
             UiKit.Place(stat, 0f, 52f, 130f, 18f, HorizontalAlignment.Center);
             frame.AddChild(stat);
 
@@ -925,14 +925,14 @@ public class RunPanel : BasePanel
             Button pickButton = UiKit.MakeButton(picked ? "已选" : "选它", false);
             pickButton.Position = new Vector2(15f, 100f);
             pickButton.Size = new Vector2(100f, 32f);
-            pickButton.Disabled = forge.Resolved;
-            pickButton.Pressed += () => OnForgePick(target);
+            pickButton.Disabled = runEvent.Resolved;
+            pickButton.Pressed += () => OnEventPick(target);
             frame.AddChild(pickButton);
         }
 
-        for (int i = 0; i < forge.Options.Count; i++)
+        for (int i = 0; i < runEvent.Options.Count; i++)
         {
-            ForgeOption option = forge.Options[i];
+            EventOption option = runEvent.Options[i];
             float x = 156f + i * 224f;
 
             Panel box = new Panel();
@@ -954,21 +954,21 @@ public class RunPanel : BasePanel
             UiKit.Place(optDesc, 10f, 30f, 180f, 34f, HorizontalAlignment.Center);
             box.AddChild(optDesc);
 
-            ForgeOption picked = option;
+            EventOption picked = option;
             Button apply = UiKit.MakeButton("选它", false);
             apply.Position = new Vector2(50f, 64f);
             apply.Size = new Vector2(100f, 26f);
-            apply.Disabled = forge.Resolved;
-            apply.Pressed += () => OnForgeApply(picked);
+            apply.Disabled = runEvent.Resolved;
+            apply.Pressed += () => OnEventApply(picked);
             box.AddChild(apply);
         }
 
-        Label note = UiKit.MakeLabel("牌库 " + state.Deck.Count + " 张　银两 " + state.Gold, 11, UiKit.Dim);
+        Label note = UiKit.MakeLabel("牌组 " + state.Deck.Count + " 张　银两 " + state.Gold, 11, UiKit.Dim);
         UiKit.Place(note, 0f, 352f, W, 22f, HorizontalAlignment.Center);
         _body.AddChild(note);
     }
 
-    private static string CardStatLine(RunCard card)
+    private static string CardStatTypeLine(RunCard card)
     {
         List<string> parts = new List<string>();
         if (card.Damage > 0)
@@ -994,30 +994,30 @@ public class RunPanel : BasePanel
         return string.Join(" ", parts);
     }
 
-    private void OnForgePick(RunCard card)
+    private void OnEventPick(RunCard card)
     {
-        if (_forgePicked.Contains(card))
+        if (_eventPicked.Contains(card))
         {
-            _forgePicked.Remove(card);
+            _eventPicked.Remove(card);
         }
         else
         {
-            if (_forgePicked.Count >= 2)
+            if (_eventPicked.Count >= 2)
             {
-                _forgePicked.RemoveAt(0);
+                _eventPicked.RemoveAt(0);
             }
-            _forgePicked.Add(card);
+            _eventPicked.Add(card);
         }
         Refresh();
     }
 
-    private void OnForgeApply(ForgeOption option)
+    private void OnEventApply(EventOption option)
     {
         RunState state = RunManager.Instance.Current;
-        bool ok = state.ApplyForgeOption(option, new List<RunCard>(_forgePicked));
+        bool ok = state.ApplyEventOption(option, new List<RunCard>(_eventPicked));
         if (ok)
         {
-            _forgePicked.Clear();
+            _eventPicked.Clear();
             RunManager.Instance.SaveRun();
         }
         Refresh();
@@ -1072,7 +1072,7 @@ public class RunPanel : BasePanel
             UiKit.Place(name, 4f, 4f, 132f, 18f, HorizontalAlignment.Left);
             frame.AddChild(name);
 
-            Label info = UiKit.MakeLabel(CardTierRules.Name(card.Tier) + "阶　" + CardStatLine(card),
+            Label info = UiKit.MakeLabel(CardTierRules.Name(card.Tier) + "阶　" + CardStatTypeLine(card),
                 11, TierColor(card.Tier));
             UiKit.Place(info, 4f, 24f, 132f, 16f, HorizontalAlignment.Left);
             frame.AddChild(info);
@@ -1121,7 +1121,7 @@ public class RunPanel : BasePanel
     }
 
     /// <summary>淬炉：每天免费给一张牌附魔（锋锐 / 疾风 / 厚土 / 蚀骨），一卡只能一个。</summary>
-    private void BuildForgeShop(RunState state, DayPhase phase)
+    private void BuildForgePanel(RunState state, DayPhase phase)
     {
         Label title = UiKit.MakeLabel("淬　炉", 22, UiKit.Gold);
         UiKit.Place(title, 0f, 14f, W, 30f, HorizontalAlignment.Center);
@@ -1172,7 +1172,7 @@ public class RunPanel : BasePanel
             UiKit.Place(name, 0f, 6f, 144f, 20f, HorizontalAlignment.Center);
             frame.AddChild(name);
 
-            Label tier = UiKit.MakeLabel(CardTierRules.Name(card.Tier) + "阶　" + CardStatLine(card),
+            Label tier = UiKit.MakeLabel(CardTierRules.Name(card.Tier) + "阶　" + CardStatTypeLine(card),
                 11, TierColor(card.Tier));
             UiKit.Place(tier, 0f, 26f, 144f, 18f, HorizontalAlignment.Center);
             frame.AddChild(tier);
@@ -1241,15 +1241,11 @@ public class RunPanel : BasePanel
     private void BuildPlaceholder(DayPhase phase)
     {
         string name = PhaseTypeExtensions.Name(phase.Type);
-        Label title = UiKit.MakeLabel(name + "　尚未实装", 20, UiKit.PaperDim);
+        Label title = UiKit.MakeLabel(name + "　这一刻无事发生", 20, UiKit.PaperDim);
         UiKit.Place(title, 0f, 100f, W, 32f, HorizontalAlignment.Center);
         _body.AddChild(title);
 
-        Label note = UiKit.MakeLabel(
-            phase.Type == PhaseType.Event
-                ? "奇遇要配事件表（师门传授 / 魔功捷径 / 异宝现世），表还没有。"
-                : "淬炉是免费附魔点（锋锐 / 疾风 / 厚土 / 蚀骨），界面还没有。",
-            12, UiKit.Dim);
+        Label note = UiKit.MakeLabel("这个时辰的界面没渲染出来，先跳过。", 12, UiKit.Dim);
         UiKit.Place(note, 0f, 142f, W, 24f, HorizontalAlignment.Center);
         _body.AddChild(note);
 

@@ -1,6 +1,6 @@
 // 文件：DeckProgress.cs
-// 描述：牌库的永久变化。目前只有「移除」关键字的牌会落到这里——
-//       打出去就从牌库永远消失，下一场也不会再出现。
+// 描述：牌组的永久变化。目前只有「移除」关键字的牌会落到这里——
+//       打出去就从牌组永远消失，下一场也不会再出现。
 //
 // 为什么单独存一份：牌组来自 CharacterConfig（配置表，只读），
 // 玩家的损耗必须写到存档里，不能改配置。
@@ -64,7 +64,7 @@ public static class DeckStore
         SaveManager.Save(Data);
     }
 
-    /// <summary>复原：把所有人的牌库损失清空（调试与"重开一局"用）。</summary>
+    /// <summary>复原：把所有人的牌组损失清空（调试与"重开一局"用）。</summary>
     public static void ResetAll()
     {
         Data.Removed.Clear();

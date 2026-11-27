@@ -15,7 +15,7 @@ public enum BattleSide
     Enemy,
 }
 
-public enum BattleEventKind
+public enum BattleEventType
 {
     Play,       // 一张牌打出（Side = 打出方，带 Slot 与 Card）
     Draw,       // 补抽进某个槽位（Side = 抽牌方）
@@ -34,7 +34,7 @@ public enum BattleEventKind
 
 public struct BattleEvent
 {
-    public BattleEventKind Kind;
+    public BattleEventType Kind;
     public BattleSide Side;
     public int Slot;
     public int Value;
@@ -169,7 +169,7 @@ public sealed class FighterState
 
     public HandSlot[] Hand;
 
-    /// <summary>消耗堆：带「消耗」关键字的牌打完进这里，本场不再洗回牌库。</summary>
+    /// <summary>消耗堆：带「消耗」关键字的牌打完进这里，本场不再洗回抽牌堆。</summary>
     public List<CardConfig> ExhaustPile = new List<CardConfig>();
 
     /// <summary>当前上场数（手牌槽位数）。基础 5，可被卡牌临时或本场改写。</summary>
@@ -598,7 +598,7 @@ public sealed class DeckBattle
         victim.Stats.DamageTaken += dealt;
 
         BattleEvent ev = new BattleEvent();
-        ev.Kind = BattleEventKind.Damage;
+        ev.Kind = BattleEventType.Damage;
         ev.Side = SideOf(victim);
         ev.Value = dealt;
         ev.Absorbed = absorbed;
@@ -692,7 +692,7 @@ public sealed class DeckBattle
         // 先报事件、后补抽：补抽会发 Draw，界面收到 Draw 就把当前这一手收尾了，
         // 事件发晚了就会丢掉"上场 +1"这条明细。
         BattleEvent evt = new BattleEvent();
-        evt.Kind = BattleEventKind.HandMod;
+        evt.Kind = BattleEventType.HandMod;
         evt.Side = SideOf(target);
         evt.Slot = -1;
         evt.Value = after;
@@ -770,7 +770,7 @@ public sealed class DeckBattle
         if (lost > 0)
         {
             BattleEvent poisonEvent = new BattleEvent();
-            poisonEvent.Kind = BattleEventKind.Poison;
+            poisonEvent.Kind = BattleEventType.Poison;
             poisonEvent.Side = SideOf(owner);
             poisonEvent.Slot = -1;
             poisonEvent.Value = lost;
@@ -849,7 +849,7 @@ public sealed class DeckBattle
         int times = card.MultiCount > 0 ? card.MultiCount : 1;
 
         BattleEvent playEvent = new BattleEvent();
-        playEvent.Kind = BattleEventKind.Play;
+        playEvent.Kind = BattleEventType.Play;
         playEvent.Side = SideOf(owner);
         playEvent.Slot = slot;
         playEvent.Card = card;
@@ -890,7 +890,7 @@ public sealed class DeckBattle
 
         if (card.HasKeyword(CardKeyword.Remove))
         {
-            // 不进任何堆：本场就此消失，同时记下来，战斗结束后从牌库永久去掉。
+            // 不进任何堆：本场就此消失，同时记下来，战斗结束后从牌组永久去掉。
             // 敌方牌组来自配置表，不记（记了也没处落）。
             if (ReferenceEquals(owner, Player))
             {
@@ -921,7 +921,7 @@ public sealed class DeckBattle
             }
 
             BattleEvent fatigueEvent = new BattleEvent();
-            fatigueEvent.Kind = BattleEventKind.Poison;
+            fatigueEvent.Kind = BattleEventType.Poison;
             fatigueEvent.Side = SideOf(owner);
             fatigueEvent.Slot = slot;
             fatigueEvent.Value = Mathf.RoundToInt(card.FatigueShift);
@@ -961,7 +961,7 @@ public sealed class DeckBattle
             owner.Stats.ShieldGained += gained;
 
             BattleEvent sh = new BattleEvent();
-            sh.Kind = BattleEventKind.Shield;
+            sh.Kind = BattleEventType.Shield;
             sh.Side = SideOf(owner);
             sh.Slot = slot;
             sh.Value = gained;
@@ -976,7 +976,7 @@ public sealed class DeckBattle
             int healed = owner.Hp - before;
 
             BattleEvent heal = new BattleEvent();
-            heal.Kind = BattleEventKind.Heal;
+            heal.Kind = BattleEventType.Heal;
             heal.Side = SideOf(owner);
             heal.Slot = slot;
             heal.Value = healed;
@@ -1001,7 +1001,7 @@ public sealed class DeckBattle
                 }
 
                 BattleEvent cure = new BattleEvent();
-                cure.Kind = BattleEventKind.Poison;
+                cure.Kind = BattleEventType.Poison;
                 cure.Side = SideOf(owner);
                 cure.Slot = slot;
                 cure.Value = stacksBefore - owner.PoisonStacks;
@@ -1016,7 +1016,7 @@ public sealed class DeckBattle
             foe.ExposeTime = ExposeDuration;
 
             BattleEvent expose = new BattleEvent();
-            expose.Kind = BattleEventKind.Expose;
+            expose.Kind = BattleEventType.Expose;
             expose.Side = SideOf(foe);
             expose.Slot = slot;
             expose.Value = foe.ExposeStacks;
@@ -1061,7 +1061,7 @@ public sealed class DeckBattle
             foe.PoisonStacks = Math.Min(PoisonMaxStacks, foe.PoisonStacks + card.Poison);
 
             BattleEvent poison = new BattleEvent();
-            poison.Kind = BattleEventKind.Poison;
+            poison.Kind = BattleEventType.Poison;
             poison.Side = SideOf(foe);
             poison.Slot = slot;
             poison.Value = card.Poison;
@@ -1085,7 +1085,7 @@ public sealed class DeckBattle
         {
             float time = card.HasteTime;
             ApplyTimingSide(owner, foe, playingSlot, card.HasteCount, hitSelf, hitFoe,
-                events, BattleEventKind.Haste, time,
+                events, BattleEventType.Haste, time,
                 delegate (HandSlot target) { target.HasteTime = Mathf.Max(target.HasteTime, time); });
         }
 
@@ -1093,7 +1093,7 @@ public sealed class DeckBattle
         {
             float time = card.SlowTime;
             ApplyTimingSide(owner, foe, playingSlot, card.SlowCount, hitSelf, hitFoe,
-                events, BattleEventKind.Slow, time,
+                events, BattleEventType.Slow, time,
                 delegate (HandSlot target) { target.SlowTime = Mathf.Max(target.SlowTime, time); });
         }
 
@@ -1101,14 +1101,14 @@ public sealed class DeckBattle
         {
             float time = card.FreezeTime;
             ApplyTimingSide(owner, foe, playingSlot, card.FreezeCount, hitSelf, hitFoe,
-                events, BattleEventKind.Freeze, time,
+                events, BattleEventType.Freeze, time,
                 delegate (HandSlot target) { target.FreezeTime = Mathf.Max(target.FreezeTime, time); });
         }
 
         if (card.HasKeyword(CardKeyword.Charge))
         {
             ApplyTimingSide(owner, foe, playingSlot, card.ChargeCount, hitSelf, hitFoe,
-                events, BattleEventKind.Charge, 0f,
+                events, BattleEventType.Charge, 0f,
                 delegate (HandSlot target) { target.Countdown = Mathf.Max(0f, target.Countdown - 1f); });
         }
     }
@@ -1131,7 +1131,7 @@ public sealed class DeckBattle
         Shuffle(foe.DrawPile, new Random());
 
         BattleEvent ev = new BattleEvent();
-        ev.Kind = BattleEventKind.Poison;
+        ev.Kind = BattleEventType.Poison;
         ev.Side = SideOf(owner);
         ev.Slot = slot;
         ev.Value = 1;
@@ -1141,7 +1141,7 @@ public sealed class DeckBattle
 
     /// <summary>按范围把同一个效果派给两边，各自发事件（记录里能看出是谁中了）。</summary>
     private void ApplyTimingSide(FighterState owner, FighterState foe, int playingSlot, int count,
-        bool hitSelf, bool hitFoe, List<BattleEvent> events, BattleEventKind kind, float duration,
+        bool hitSelf, bool hitFoe, List<BattleEvent> events, BattleEventType kind, float duration,
         System.Action<HandSlot> apply)
     {
         if (hitSelf)
@@ -1195,7 +1195,7 @@ public sealed class DeckBattle
         return applied;
     }
 
-    private void AddTimingEvent(List<BattleEvent> events, FighterState owner, BattleEventKind kind,
+    private void AddTimingEvent(List<BattleEvent> events, FighterState owner, BattleEventType kind,
         int count, float duration)
     {
         if (count <= 0)
@@ -1216,7 +1216,7 @@ public sealed class DeckBattle
         int hpDamage, int absorbed, SpellElement element, List<BattleEvent> events)
     {
         BattleEvent dmg = new BattleEvent();
-        dmg.Kind = BattleEventKind.Damage;
+        dmg.Kind = BattleEventType.Damage;
         dmg.Side = SideOf(foe);
         dmg.Slot = slot;
         dmg.Value = hpDamage > 0 ? hpDamage : (element != SpellElement.None ? card.Spell : card.Damage);
@@ -1263,7 +1263,7 @@ public sealed class DeckBattle
         handSlot.Countdown = card.Countdown;
 
         BattleEvent draw = new BattleEvent();
-        draw.Kind = BattleEventKind.Draw;
+        draw.Kind = BattleEventType.Draw;
         draw.Side = SideOf(owner);
         draw.Slot = slot;
         draw.Card = card;
@@ -1381,7 +1381,7 @@ public sealed class DeckBattle
         }
 
         BattleEvent end = new BattleEvent();
-        end.Kind = BattleEventKind.End;
+        end.Kind = BattleEventType.End;
         end.Side = PlayerWon ? BattleSide.Player : BattleSide.Enemy;
         end.Text = TimedOut ? "时辰已尽" : (PlayerWon ? "胜" : "败");
         events.Add(end);

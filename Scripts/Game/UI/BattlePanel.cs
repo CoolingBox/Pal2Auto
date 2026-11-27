@@ -685,7 +685,7 @@ public class BattlePanel : BasePanel
         _resultOverlay.Visible = false;
         SyncCards();
         RefreshStatus();
-        AddLogLine("开局：双方各抽 " + DeckBattle.HandBase + " 张（我方牌库 " + deck.Count +
+        AddLogLine("开局：双方各抽 " + DeckBattle.HandBase + " 张（我方抽牌堆 " + deck.Count +
                    " 张），倒计时归零自动出手");
         RefreshLogView();
     }
@@ -757,7 +757,7 @@ public class BattlePanel : BasePanel
 
             switch (evt.Kind)
             {
-                case BattleEventKind.Play:
+                case BattleEventType.Play:
                     FlushPending();
                     BeginPlayLog(evt);
 
@@ -775,12 +775,12 @@ public class BattlePanel : BasePanel
                     }
                     break;
 
-                case BattleEventKind.Draw:
+                case BattleEventType.Draw:
                     // 补抽太密，明细里不记（牌堆在右侧）；但要把上一手收尾
                     FlushPending();
                     break;
 
-                case BattleEventKind.Damage:
+                case BattleEventType.Damage:
                     AppendDamageLog(evt);
 
                     Color dmgColor = evt.Element == SpellElement.None
@@ -795,19 +795,19 @@ public class BattlePanel : BasePanel
                     }
                     break;
 
-                case BattleEventKind.Shield:
+                case BattleEventType.Shield:
                     AppendDetail(C(UiKit.ShieldGold, "+" + evt.Value + "护"));
                     ShowFloating(evt.Side == BattleSide.Enemy ? EnemyPoint() : PlayerPoint(),
                         "+" + evt.Value + " 护", UiKit.ShieldGold);
                     break;
 
-                case BattleEventKind.Heal:
+                case BattleEventType.Heal:
                     AppendDetail(C(UiKit.HealGreen, "+" + evt.Value + "气"));
                     ShowFloating(evt.Side == BattleSide.Enemy ? EnemyPoint() : PlayerPoint(),
                         "+" + evt.Value, UiKit.HealGreen);
                     break;
 
-                case BattleEventKind.Poison:
+                case BattleEventType.Poison:
                     if (evt.Slot < 0)
                     {
                         // 中毒跳伤：自己一行，不挂在某张牌上
@@ -825,35 +825,35 @@ public class BattlePanel : BasePanel
                         "-" + evt.Value, UiKit.PoisonGreen);
                     break;
 
-                case BattleEventKind.Expose:
+                case BattleEventType.Expose:
                     AppendDetail(C(UiKit.ExposeViolet, "破" + evt.Value));
                     ShowFloating(evt.Side == BattleSide.Enemy ? EnemyPoint() : PlayerPoint(),
                         "破绽 " + evt.Value, UiKit.ExposeViolet);
                     break;
 
-                case BattleEventKind.Haste:
+                case BattleEventType.Haste:
                     AppendDetail(C(UiKit.HasteGreen, WhoTag(evt.Side) + "速" +
                         CardColors.Amount(evt.Value) + "·" + ShortTime(evt.Duration) + "s"));
                     break;
 
-                case BattleEventKind.Slow:
+                case BattleEventType.Slow:
                     AppendDetail(C(UiKit.SlowBlue, WhoTag(evt.Side) + "缓" +
                         CardColors.Amount(evt.Value) + "·" + ShortTime(evt.Duration) + "s"));
                     break;
 
-                case BattleEventKind.Freeze:
+                case BattleEventType.Freeze:
                     AppendDetail(C(UiKit.FreezeIce, WhoTag(evt.Side) + "冻" +
                         CardColors.Amount(evt.Value) + "·" + ShortTime(evt.Duration) + "s"));
                     ShowFloating(evt.Side == BattleSide.Enemy ? EnemyPoint() : PlayerPoint(),
                         "冰冻 " + CardColors.Amount(evt.Value) + " 张", UiKit.FreezeIce);
                     break;
 
-                case BattleEventKind.Charge:
+                case BattleEventType.Charge:
                     AppendDetail(C(UiKit.ChargeGold, WhoTag(evt.Side) + "充" +
                         CardColors.Amount(evt.Value)));
                     break;
 
-                case BattleEventKind.HandMod:
+                case BattleEventType.HandMod:
                     if (_pending.Active)
                     {
                         AppendDetail(C(UiKit.HandTeal, "上" + evt.Value));
@@ -870,7 +870,7 @@ public class BattlePanel : BasePanel
                         "上场 " + evt.Value, UiKit.HandTeal);
                     break;
 
-                case BattleEventKind.End:
+                case BattleEventType.End:
                     FlushPending();
                     _endDelay = 0.8f;
                     break;
@@ -1109,7 +1109,7 @@ public class BattlePanel : BasePanel
         _enemyStatus.Text = BuildStatus(e);
 
         _playerMeta.Text = "已出 " + p.Stats.Played + " 张　上场 " + p.ActiveSlots +
-                           (p.PendingHandRevert ? "（出牌时收）" : "");
+                           (p.PendingHandRevert ? "（出手时收）" : "");
 
         CardConfig intent = _battle.EnemyFastestCard();
         string next = intent != null ? intent.Name : "—";
@@ -1208,7 +1208,7 @@ public class BattlePanel : BasePanel
             }
         }
 
-        // 「移除」的牌在这里落盘：一场结束后从牌库永久去掉，下一场不再出现
+        // 「移除」的牌在这里落盘：一场结束后从牌组永久去掉，下一场不再出现
         if (_battle != null && _battle.RemovedCardIds.Count > 0)
         {
             DeckStore.AddRemoved(GameFlow.SelectedCharacterId, _battle.RemovedCardIds);

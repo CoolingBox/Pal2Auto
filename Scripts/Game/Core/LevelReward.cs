@@ -4,7 +4,7 @@
 // 为什么单独一个类型：奖励是「数据 + 一句描述」，效果由 RunState.ApplyReward 统一执行。
 // 把效果写进数据类会变成 switch 套 switch，后面加一种奖励要改三处。
 
-public enum LevelRewardKind
+public enum LevelRewardType
 {
     Bone,      // 铁骨：气血上限
     Coin,      // 盘缠：银两
@@ -15,7 +15,7 @@ public enum LevelRewardKind
 
 public sealed class LevelReward
 {
-    public LevelRewardKind Kind;
+    public LevelRewardType Kind;
     public string Name = "";
     public string Desc = "";
 }

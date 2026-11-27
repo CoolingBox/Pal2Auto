@@ -63,7 +63,7 @@ public sealed class RunCard
     /// <summary>先发：战斗开始时优先进入起手手牌。</summary>
     public bool PriorityDraw;
 
-    /// <summary>后发：洗牌后沉到牌库底。</summary>
+    /// <summary>后发：洗牌后沉到抽牌堆底。</summary>
     public bool BottomOfDeck;
 
     /// <summary>多动：多重次数修正（正数 = 多打几次）。</summary>
