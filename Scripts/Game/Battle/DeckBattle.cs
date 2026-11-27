@@ -153,6 +153,14 @@ public sealed class FighterState
     public float PoisonAccum;
     public float PoisonDecay;
 
+    // —— 疲劳（沙尘暴）—— 每方独立计时，卡牌效果可以提前或延后
+    /// <summary>这一方的疲劳在第几秒开始（绝对时间）。默认 SandstormStart。</summary>
+    public float FatigueStart;
+    /// <summary>这一方已经挨了几阵。</summary>
+    public int FatigueTicks;
+    /// <summary>这一方的跳间计时器。</summary>
+    public float FatigueTimer;
+
     /// <summary>破绽层数：每层使其受到的所有伤害 +15%，最多 3 层，4 秒后清零。</summary>
     public int ExposeStacks;
     public float ExposeTime;
@@ -234,26 +242,35 @@ public sealed class DeckBattle
     public const int SandstormBase = 1;
     public const int SandstormStep = 1;
 
-    /// <summary>沙尘暴已经跳了几次（0 = 还没开始）。</summary>
-    public int SandstormTicks;
+    /// <summary>沙尘暴是否已经开始（任一方进入疲劳）。</summary>
+    public int SandstormTicks
+    {
+        get
+        {
+            int ticks = Player.FatigueTicks;
+            if (Enemy.FatigueTicks > ticks)
+            {
+                ticks = Enemy.FatigueTicks;
+            }
+            return ticks;
+        }
+    }
 
-    private float _sandstormTimer;
-
-    /// <summary>下一次沙尘暴伤害（界面上显示"下一跳 N"用）。</summary>
+    /// <summary>下一阵沙尘暴伤害（界面上显示"下一跳 N"用，取玩家侧的）。</summary>
     public int SandstormNextDamage
     {
         get
         {
-            return SandstormBase + SandstormStep * SandstormTicks;
+            return SandstormBase + SandstormStep * Player.FatigueTicks;
         }
     }
 
-    /// <summary>沙尘暴是否已经开始。</summary>
+    /// <summary>沙尘暴是否已经开始（任一方）。</summary>
     public bool SandstormActive
     {
         get
         {
-            return Elapsed >= SandstormStart;
+            return Elapsed >= Player.FatigueStart || Elapsed >= Enemy.FatigueStart;
         }
     }
 
@@ -386,6 +403,7 @@ public sealed class DeckBattle
         fighter.Portrait = portrait;
         fighter.MaxHp = maxHp;
         fighter.Hp = maxHp;
+        fighter.FatigueStart = SandstormStart;
         fighter.Hand = new HandSlot[HandMax];
 
         for (int i = 0; i < HandMax; i++)
@@ -449,6 +467,7 @@ public sealed class DeckBattle
         fighter.Portrait = portrait;
         fighter.MaxHp = maxHp;
         fighter.Hp = maxHp;
+        fighter.FatigueStart = SandstormStart;
         fighter.Hand = new HandSlot[HandMax];
 
         for (int i = 0; i < HandMax; i++)
@@ -511,7 +530,8 @@ public sealed class DeckBattle
         TickHandMods(dt);
         TickFighter(Player, Enemy, dt, events);
         TickFighter(Enemy, Player, dt, events);
-        TickSandstorm(dt, events);
+        TickFatigue(Player, dt, events);
+        TickFatigue(Enemy, dt, events);
 
         CheckEnd(events);
         return events;
@@ -520,23 +540,42 @@ public sealed class DeckBattle
     /// <summary>
     /// 沙尘暴：TimeLimit 到点前先替玩家结束战斗。伤害无视护体（护体是「挡刀」的，挡不了天气）。
     /// </summary>
-    private void TickSandstorm(float dt, List<BattleEvent> events)
+    /// <summary>
+    /// 疲劳（沙尘暴）：**每方各自计时**，谁的 FatigueStart 先到谁先开始挨风沙。
+    /// 卡牌可以用 `FatigueShift` 把某一边的疲劳提前（打快攻）或延后（拖后期）。
+    /// </summary>
+    private void TickFatigue(FighterState owner, float dt, List<BattleEvent> events)
     {
-        if (Elapsed < SandstormStart)
+        if (owner.Dead || Elapsed < owner.FatigueStart)
         {
             return;
         }
 
-        _sandstormTimer += dt;
-        while (_sandstormTimer >= SandstormInterval)
+        owner.FatigueTimer += dt;
+        while (owner.FatigueTimer >= SandstormInterval)
         {
-            _sandstormTimer -= SandstormInterval;
+            owner.FatigueTimer -= SandstormInterval;
 
-            int damage = SandstormBase + SandstormStep * SandstormTicks;
-            SandstormTicks++;
+            int damage = SandstormBase + SandstormStep * owner.FatigueTicks;
+            owner.FatigueTicks++;
+            ApplySandstormHit(owner, damage, events);
+        }
+    }
 
-            ApplySandstormHit(Player, damage, events);
-            ApplySandstormHit(Enemy, damage, events);
+    /// <summary>疲劳开始时间的下限：再快也不能开局就刮风。</summary>
+    public const float MinFatigueStart = 8f;
+
+    /// <summary>把某一方的疲劳提前（正数）或延后（负数）。卡牌效果走这里。</summary>
+    private void ShiftFatigue(FighterState target, float seconds)
+    {
+        if (target == null || seconds == 0f)
+        {
+            return;
+        }
+        target.FatigueStart -= seconds;
+        if (target.FatigueStart < MinFatigueStart)
+        {
+            target.FatigueStart = MinFatigueStart;
         }
     }
 
@@ -560,7 +599,7 @@ public sealed class DeckBattle
         ev.Side = SideOf(victim);
         ev.Value = dealt;
         ev.Absorbed = absorbed;
-        ev.Text = "沙尘暴 " + damage + "（第 " + SandstormTicks + " 阵）";
+        ev.Text = "沙尘暴 " + damage + "（" + victim.Name + " 第 " + victim.FatigueTicks + " 阵）";
         events.Add(ev);
     }
 
@@ -863,6 +902,30 @@ public sealed class DeckBattle
     private void ResolveCard(FighterState owner, FighterState foe, CardConfig card, int slot, List<BattleEvent> events)
     {
         ApplyTimingEffects(owner, foe, card, slot, events);
+
+        // 疲劳位移：Scope 决定打给谁（Self / Foe / Both）。正数提前、负数延后。
+        if (card.FatigueShift != 0f)
+        {
+            bool hitSelf = card.Scope == TimingScope.Self || card.Scope == TimingScope.Both;
+            bool hitFoe = card.Scope == TimingScope.Foe || card.Scope == TimingScope.Both;
+            if (hitSelf)
+            {
+                ShiftFatigue(owner, card.FatigueShift);
+            }
+            if (hitFoe)
+            {
+                ShiftFatigue(foe, card.FatigueShift);
+            }
+
+            BattleEvent fatigueEvent = new BattleEvent();
+            fatigueEvent.Kind = BattleEventKind.Poison;
+            fatigueEvent.Side = SideOf(owner);
+            fatigueEvent.Slot = slot;
+            fatigueEvent.Value = Mathf.RoundToInt(card.FatigueShift);
+            fatigueEvent.Text = (card.FatigueShift > 0f ? "催命 " : "续命 ") +
+                Mathf.Abs(card.FatigueShift).ToString("0.0") + " 秒";
+            events.Add(fatigueEvent);
+        }
 
         // 野球拳式：往后两边牌组各塞一张。只动本场的抽牌堆，不动玩家真正的牌组。
         if (card.SpawnCardId > 0)

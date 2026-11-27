@@ -313,7 +313,7 @@ NEW = [
     (167, "镇妖塔", 0, "Spell", 4.6, {"Spell": 24}, "",
      "Charm,Thunder", "item_amulet2", "塔影压下，妖邪俱伏。"),
     (168, "灵芝", 0, "Heal", 3.0, {"Heal": 10}, "Exhaust",
-     "Pill,Heal", "item_pill", "山中所采，吊命够用。"),
+     "Pill,Heal", "item_pill2", "山中所采，吊命够用。"),
     (169, "天仙玉露", 0, "Heal", 3.2, {"Shield": 6, "Heal": 14}, "Exhaust",
      "Pill,Heal,Shield", "item_pill2", "玉露入喉，血就止住了。"),
     (170, "九转还魂丹", 0, "Heal", 4.4, {"Heal": 26}, "Exhaust",
@@ -409,13 +409,13 @@ NEW = [
     (212, "符纸伞", 0, "Attack", 3.0, {"Damage": 12, "Shield": 6}, "",
      "Fan,Physical,Shield", "item_talisman_guard", "伞面贴满灵符，可借鬼神之力。"),
     (213, "止血草", 0, "Heal", 2.6, {"Heal": 6}, "Exhaust",
-     "Pill,Heal", "item_pill", "嚼碎敷上，血就止住了。"),
+     "Pill,Heal", "item_pill2", "嚼碎敷上，血就止住了。"),
     (214, "行军丹", 0, "Heal", 2.8, {"Heal": 9}, "Exhaust",
      "Pill,Heal", "item_pill2", "活血顺气的药丸。"),
     (215, "紫菁玉蓉膏", 0, "Heal", 4.6, {"Heal": 30}, "Exhaust",
      "Pill,Heal", "item_pill4", "宫廷秘方，疗伤药里的极品。"),
     (216, "鼠儿果", 0, "Heal", 2.8, {"Heal": 8}, "Exhaust",
-     "Pill,Heal", "item_pill", "山间野果，鼠类先尝过的。"),
+     "Pill,Heal", "item_pill2", "山间野果，鼠类先尝过的。"),
     (217, "灵山仙芝", 0, "Heal", 3.2, {"Heal": 12}, "Exhaust",
      "Pill,Heal", "item_pill2", "生于枯木的瑞草，养气培元。"),
     (218, "雪莲子", 0, "Heal", 3.6, {"Heal": 16}, "Exhaust",
@@ -425,13 +425,13 @@ NEW = [
     (220, "神仙茶", 0, "Heal", 5.0, {"Heal": 34}, "Exhaust",
      "Pill,Heal", "item_pill3", "广成子养生延寿的秘方。"),
     (221, "陈皮守宫", 0, "Heal", 3.0, {"Heal": 11}, "Exhaust",
-     "Pill,Heal", "item_pill", "陈皮配守宫，气味难闻但管用。"),
+     "Pill,Heal", "item_pill2", "陈皮配守宫，气味难闻但管用。"),
     (222, "朱星", 0, "Heal", 4.2, {"Heal": 26}, "Exhaust",
      "Pill,Heal", "item_pill4", "朱红一颗，吊命最灵。"),
     (223, "人参蛆", 0, "Heal", 4.0, {"Heal": 20}, "Exhaust",
      "Pill,Heal", "item_pill3", "人参里长的蛆，药性极重。"),
     (224, "百草蜘蛛", 0, "Heal", 2.6, {"Heal": 7}, "Exhaust",
-     "Pill,Heal", "item_pill", "吃百草长大的蜘蛛，入药。"),
+     "Pill,Heal", "item_pill2", "吃百草长大的蜘蛛，入药。"),
     (225, "冬草夏虫", 0, "Heal", 3.4, {"Heal": 14}, "Exhaust",
      "Pill,Heal", "item_pill2", "冬为草、夏为虫，一物两用。"),
     (226, "灵芝蛤蟆", 0, "Heal", 5.2, {"Heal": 36}, "Exhaust",
@@ -441,11 +441,11 @@ NEW = [
     (228, "嗜血蜂", 0, "Heal", 4.4, {"Heal": 28}, "Exhaust",
      "Pill,Heal", "item_pill4", "好血腥味的蜂，入药奇效。"),
     (229, "鬼枯藤", 0, "Heal", 2.4, {"Heal": 5}, "Exhaust",
-     "Pill,Heal", "item_pill", "黑褐色的毒藤，却也能解毒。"),
+     "Pill,Heal", "item_pill2", "黑褐色的毒藤，却也能解毒。"),
     (230, "九节菖蒲", 0, "Heal", 2.6, {"Heal": 6}, "Exhaust",
-     "Pill,Heal", "item_pill", "叶狭长如剑，可解百毒。"),
+     "Pill,Heal", "item_pill2", "叶狭长如剑，可解百毒。"),
     (231, "盐巴", 0, "Heal", 2.0, {"Heal": 4}, "Exhaust",
-     "Pill,Heal", "item_pill", "海水煎出来的，有时也解毒。"),
+     "Pill,Heal", "item_pill2", "海水煎出来的，有时也解毒。"),
     (232, "雄黄酒", 0, "Heal", 2.4, {"Heal": 5}, "Exhaust",
      "Pill,Heal", "item_pill2", "端午的习俗，雄黄撒进酒里。"),
     (233, "大蒜", 0, "Guard", 2.2, {"Shield": 8}, "Exhaust",
@@ -550,6 +550,12 @@ NEW = [
      "Gu,Shield", "item_armor2", "雪里蹲着的蛤蟆，皮冻得比铁硬。"),
     (283, "野球拳", 0, "Attack", 4.0, {"Damage": 6, "SpawnCardId": 283}, "",
      "Palm,Physical", "item_amulet2", "谁都会的一拳。打完两边都学会了这一招。"),
+    (284, "催命符", 0, "Spell", 5.0, {"FatigueShift": 6.0, "Scope": "Foe"}, "",
+     "Talisman,Control", "item_talisman3", "一张黄纸，写上名字。对方的风沙来得早一些。"),
+    (285, "续命丹", 0, "Heal", 6.0, {"Heal": 8, "FatigueShift": -6.0, "Scope": "Self"}, "",
+     "Pill,Heal", "item_pill2", "吞下去，能多撑一阵。自己的风沙晚一点到。"),
+    (286, "同归帖", 0, "Attack", 6.0, {"Damage": 6, "FatigueShift": 5.0, "Scope": "Both"}, "",
+     "Control,Physical", "item_talisman6", "既然要打，就早点打完。双方的风沙一起提前。"),
     # ================= 起始基础卡（只在开局牌组里出现，不进商店） =================
     (143, "劈砍", 0, "Attack", 1.4, {"Damage": 3}, "",
      "Blade,Physical", "item_saber", "最基础的刀招。砍得动，但砍不快。"),
@@ -660,7 +666,11 @@ NEW_TIERS = {
     273: "Silver",
     274: "Silver",
     275: "Gold",
-    276: "Gold"
+    276: "Gold",
+    283: "Copper",
+    284: "Copper",
+    285: "Silver",
+    286: "Gold"
 }
 
 # 起始牌组专用卡：不进任何商店、不出现在遭遇奖励里，只能靠删牌去掉。
@@ -693,7 +703,8 @@ def build_card(cid, name, master, ctype, cd, values, keywords, tags, icon, desc)
     for key in ("Damage", "Spell", "Element", "Expose", "Shield", "Heal", "Poison",
                 "IgnoreShield", "HandSelf", "HandFoe", "HandTime", "Scope",
                 "HasteCount", "HasteTime", "SlowCount", "SlowTime",
-                "FreezeCount", "FreezeTime", "ChargeCount", "MultiCount", "SpawnCardId"):
+                "FreezeCount", "FreezeTime", "ChargeCount", "MultiCount", "SpawnCardId",
+                "FatigueShift"):
         if key in values and values[key] not in (0, None, "None"):
             card[key] = values[key]
     if keywords:
@@ -711,9 +722,23 @@ def build_card(cid, name, master, ctype, cd, values, keywords, tags, icon, desc)
 
 def main():
     # 卡表可能已经被 expand_card_tiers.py 展开成「每阶一条」——
-    # 这里只取 Id < 1000 的起步版作为原始定义，否则重跑会把展开结果当输入再展一次。
+    # 这里只取**每族的起步阶条目**作为原始定义，否则重跑会把展开结果当输入再展一次。
+    # 不能用「Id < 1000」判断：银/金起步的卡（如龙渊剑 Gold）展开后只有 2148/3148，没有 < 1000 的条目，
+    # 会被整族丢掉（2026-11-27 踩过一次，卡表从 279 掉到 260）。
     all_cards = json.load(open(PATH, encoding="utf-8"))
-    old = [c for c in all_cards if c["Id"] < 1000]
+    tier_rank = {"Copper": 0, "Silver": 1, "Gold": 2, "Diamond": 3}
+    by_base = {}
+    for c in all_cards:
+        base = c.get("BaseId", c["Id"] % 1000)
+        rank = tier_rank.get(c.get("MinTier", "Copper"), 0)
+        if base not in by_base or rank < by_base[base][0]:
+            by_base[base] = (rank, c)
+    old = []
+    foreach_value = list(by_base.values())
+    for i in range(len(foreach_value)):
+        entry = dict(foreach_value[i][1])
+        entry["Id"] = foreach_value[i][1].get("BaseId", foreach_value[i][1]["Id"] % 1000)
+        old.append(entry)
     old_ids = {c["Id"] for c in old}
 
     # NEW 的第 3 列是 master（武学归属）。已存在的卡从这里恢复归属 ——

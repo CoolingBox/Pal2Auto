@@ -341,6 +341,12 @@ public sealed class RunCard
         copy.FreezeCount = cfg.FreezeCount;
         copy.FreezeTime = cfg.FreezeTime;
         copy.ChargeCount = cfg.ChargeCount;
+        copy.BaseId = cfg.BaseId;
+        // 下面两个是「后加的机制字段」，曾经漏在这里 ——
+        // 漏了的表现是：面板上写得清清楚楚，进战斗一点效果没有（野球拳不塞牌、催命符不催命）。
+        // 以后往 CardConfig 加机制字段，先来这里补一行。
+        copy.SpawnCardId = cfg.SpawnCardId;
+        copy.FatigueShift = cfg.FatigueShift;
         // MultiCount 的语义是「打几次」：配置里 0 和 1 都表示单次，
         // 所以「多动 +1」要先把它归一到 1 再加，否则对单次卡 +1 还是 1（等于没加）。
         int baseMulti = cfg.MultiCount <= 1 ? 1 : cfg.MultiCount;
