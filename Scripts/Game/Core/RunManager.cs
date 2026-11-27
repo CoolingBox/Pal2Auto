@@ -129,7 +129,7 @@ public sealed class RunManager : Singleton<RunManager>
         if (type == PhaseType.Shop)
         {
             // 每次进集市都开一家新店：同一天进两次，就是两家不同的铺子
-            Current.Shop.Open(Current.Day, Current.CharacterId, Current.Rng);
+            Current.Shop.Open(Current.Day, Current.CharacterId, Current.Rng, Current.Deck);
             Current.Notes.Add("进了" + Current.Shop.ShopName);
         }
         SaveRun();
@@ -275,7 +275,7 @@ public sealed class RunManager : Singleton<RunManager>
         Current.FreeEnchantUsed = false;
         Current.Shop.ResetForNewDay();
         Current.Shop.FreeRefreshCount = Current.FreeRefreshPerDay;
-        Current.Shop.Open(Current.Day, Current.CharacterId, Current.Rng);
+        Current.Shop.Open(Current.Day, Current.CharacterId, Current.Rng, Current.Deck);
 
         Current.Notes.Add("第 " + Current.Day + " 天开始：日俸 +" + salary + " 银两，银两 " + Current.Gold);
     }

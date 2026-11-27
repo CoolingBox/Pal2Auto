@@ -307,10 +307,12 @@ public static class CardPool
     /// 这时往上找最近的、有货的阶，价格也按那个阶算，而不是硬塞一张别品类的卡。
     /// </summary>
     public static CardConfig PickForShop(CardTier tier, ShopKind kind, int characterId,
-        Random rng, List<int> excludeIds, out CardTier actualTier)
+        Random rng, List<int> excludeIds, out CardTier actualTier, CardTier maxTier = CardTier.Diamond)
     {
         int start = (int)tier;
-        for (int t = start; t <= CardTierRules.MaxTier; t++)
+        // 往上找「有货的阶」时不能超过当天上限：第 2 天银池空了，也不能把金卡摆出来
+        int ceiling = (int)maxTier;
+        for (int t = start; t <= ceiling; t++)
         {
             List<CardConfig> pool = CandidatesForShop((CardTier)t, kind, characterId);
             List<CardConfig> usable = WithoutExcluded(pool, excludeIds);

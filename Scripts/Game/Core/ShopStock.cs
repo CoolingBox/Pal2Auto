@@ -64,12 +64,112 @@ public sealed class ShopStock
     // —————————————————————— 开店 ——————————————————————
 
     /// <summary>开一家新店并进货。每次进集市时辰调一次。</summary>
-    public void Open(int day, int characterId, Random rng)
+    /// <summary>这家店是哪天开的（对齐牌组阶位时要用当天的品阶上限）。</summary>
+    public int Day = 1;
+
+    public void Open(int day, int characterId, Random rng, List<RunCard> deck = null)
     {
+        Day = day;
         Kind = RollKind(rng);
         Grade = RollGrade(day, rng);
         RefreshCount = 0;
         Restock(day, characterId, rng);
+        AlignToDeck(deck);
+    }
+
+    /// <summary>
+    /// 货架对齐牌组：**牌组里已经有某个族，这家店就只卖该族的最高那一阶**（2026-11-27 用户定）。
+    ///
+    /// 为什么：同族再获得会自动升阶，而升的是「牌组里阶位最低那张」。
+    /// 如果牌组已经是「大刀·银」，店里却摆着「大刀·铜」，买下来只是把银升成金 —— 花铜的钱办银的事，
+    /// 玩家会觉得莫名其妙。对齐之后，买到的永远是「和你手上同阶」的那张，升一阶就够。
+    ///
+    /// 已经到钻的族直接撤柜：买了也升不上去，纯浪费 240 两。
+    /// </summary>
+    /// <summary>
+    /// 当天货架能卖到的最高阶。取自 `CardTierRules.DayWeights` 里最后一个非零项 ——
+    /// 权重表本来就是「某阶权重 0 = 当天不出」，这里只是把它翻译成一个上限值。
+    /// </summary>
+    public CardTier MaxTierToday()
+    {
+        int[] weights = CardTierRules.DayWeights(Day);
+        int last = 0;
+        for (int i = 0; i < 4; i++)
+        {
+            if (weights[i] > 0)
+            {
+                last = i;
+            }
+        }
+        return (CardTier)(last + 1);
+    }
+
+    private void AlignToDeck(List<RunCard> deck)
+    {
+        if (deck == null || deck.Count == 0)
+        {
+            return;
+        }
+
+        for (int i = Offers.Count - 1; i >= 0; i--)
+        {
+            ShopOffer offer = Offers[i];
+            if (offer.Card == null || offer.Sold)
+            {
+                continue;
+            }
+
+            int baseId = CardTierRules.BaseIdOf(offer.Card.CardId);
+            CardTier best = CardTier.Copper;
+            bool found = false;
+
+            for (int k = 0; k < deck.Count; k++)
+            {
+                if (CardTierRules.BaseIdOf(deck[k].CardId) != baseId)
+                {
+                    continue;
+                }
+                if (!found || (int)deck[k].Tier > (int)best)
+                {
+                    best = deck[k].Tier;
+                    found = true;
+                }
+            }
+
+            if (!found)
+            {
+                continue;
+            }
+
+            // 天数上限：第 2 天就算牌库里有金大刀，货架也不能摆金（DayWeights 里金的权重是 0）
+            CardTier cap = MaxTierToday();
+            CardTier target = best;
+            if ((int)target > (int)cap)
+            {
+                target = cap;
+            }
+
+            if (best == CardTier.Diamond && (int)cap >= (int)CardTier.Diamond)
+            {
+                Offers.RemoveAt(i);
+                continue;
+            }
+
+            if ((int)offer.Card.Tier >= (int)target)
+            {
+                continue;
+            }
+
+            int alignedId = CardTierRules.TierIdOf(baseId, target);
+            CardConfig aligned = ConfigManager.GetOne<CardConfig>(alignedId);
+            if (aligned == null)
+            {
+                continue;
+            }
+
+            offer.Card = new RunCard(alignedId, target);
+            offer.Price = PriceOf(target, Grade);
+        }
     }
 
     /// <summary>同店重新进货。刷新按钮调这个，不换店也不换档次。</summary>
@@ -82,7 +182,8 @@ public sealed class ShopStock
         {
             CardTier tier = RollTier(day, Grade, rng);
             CardTier actualTier = tier;
-            CardConfig config = CardPool.PickForShop(tier, Kind, characterId, rng, usedIds, out actualTier);
+            CardConfig config = CardPool.PickForShop(tier, Kind, characterId, rng, usedIds,
+                out actualTier, MaxTierToday());
             if (config == null)
             {
                 continue;

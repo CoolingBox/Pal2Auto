@@ -372,6 +372,50 @@ public static class DevShot
             run.Current.Day = dayOverride;
         }
 
+        // --shopalign=1 验「货架对齐牌组阶位」：先塞一张大刀·银，再刷店看有没有铜版大刀
+        if (ReadIntArg("--shopalign=", 0) > 0)
+        {
+            RunState st = run.Current;
+            int probeDay = ReadIntArg("--day=", 1);
+            if (probeDay > 0)
+            {
+                st.Day = probeDay;
+            }
+            // 塞一张金大刀：验「牌库有金卡，但当天上限是银」时货架只到银
+            st.AddCard(new RunCard(2001, CardTier.Gold));
+            st.Shop.Open(st.Day, st.CharacterId, st.Rng, st.Deck);
+            GD.Print("ALIGN 第 " + st.Day + " 天（上限 " + st.Shop.MaxTierToday() + "），牌组已有大刀·金");
+            // 商店池子大，单次抽不到大刀很正常 —— 连刷 60 次，只统计「大刀」这一族
+            int hits = 0;
+            int wrong = 0;
+            for (int round = 0; round < 300; round++)
+            {
+                st.Shop.Open(st.Day, st.CharacterId, st.Rng, st.Deck);
+                for (int i = 0; i < st.Shop.Offers.Count; i++)
+                {
+                    ShopOffer offer = st.Shop.Offers[i];
+                    if (offer.Card.CardName != "大刀")
+                    {
+                        continue;
+                    }
+                    hits++;
+                    // 第 2 天的上限是银：金大刀也不能把金卡摆上货架
+                    if ((int)offer.Card.Tier > (int)st.Shop.MaxTierToday())
+                    {
+                        wrong++;
+                        GD.Print("ALIGN 异常：大刀出现了 " + offer.Card.DisplayName +
+                            "（超过当天上限 " + st.Shop.MaxTierToday() + "）");
+                    }
+                }
+            }
+            GD.Print("ALIGN 300 次刷新里大刀出现 " + hits + " 次（应全为 " +
+                (st.Shop.MaxTierToday() >= CardTier.Gold ? "金" : "银") +
+                "），超出当天上限 " + wrong + " 次（期望 0）");
+            System.Console.Out.Flush();
+            host.GetTree().Quit(0);
+            return;
+        }
+
         // 从存档读一局，打印关键状态（验存档是否真的能续上）：--ui=runresume
         if (mode == "resume")
         {

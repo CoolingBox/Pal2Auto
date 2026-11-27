@@ -437,7 +437,7 @@ public sealed class RunState
         Today.Build();
         Shop.ResetForNewDay();
         Shop.FreeRefreshCount = FreeRefreshPerDay;
-        Shop.Open(Day, CharacterId, Rng);
+        Shop.Open(Day, CharacterId, Rng, Deck);
 
         Notes.Add("开局：" + CharacterName + "，牌组 " + Deck.Count + " 张，银两 " + Gold);
     }
