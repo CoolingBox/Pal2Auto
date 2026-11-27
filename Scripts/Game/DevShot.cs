@@ -50,6 +50,10 @@ public static class DevShot
             }
             if (all[i] == "--ui=runevent")
             {
+                if (ReadIntArg("--eventsel=", 0) > 0)
+                {
+                    AutoPickFirstEventCard = true;
+                }
                 OpenRunLater(host, "event");
             }
             if (all[i] == "--ui=runforge")
@@ -713,6 +717,9 @@ public static class DevShot
     /// <summary>读 `--xxx=abc` 形式的字符串参数，缺省时返回 fallback。</summary>
     /// <summary>--ui=rundeck 用：RunPanel 第一次刷新时把牌组抽屉打开。</summary>
     public static bool OpenDeckOnStart;
+
+    /// <summary>--ui=runevent --eventsel=1 用：自动选中第一张候选，截「已定」态用。</summary>
+    public static bool AutoPickFirstEventCard;
 
     private static string ReadStringArg(string prefix, string fallback)
     {

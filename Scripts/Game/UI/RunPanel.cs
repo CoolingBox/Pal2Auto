@@ -896,6 +896,14 @@ public class RunPanel : BasePanel
             return;
         }
 
+        if (DevShot.AutoPickFirstEventCard && _eventPicked.Count == 0 && runEvent.Candidates.Count > 0)
+        {
+            DevShot.AutoPickFirstEventCard = false;
+            _eventPicked.Add(runEvent.Candidates[0]);
+            Refresh();
+            return;
+        }
+
         Label title = UiKit.MakeLabel("百　炼　台", 22, UiKit.Gold);
         UiKit.Place(title, 0f, 18f, W, 30f, HorizontalAlignment.Center);
         _body.AddChild(title);
@@ -917,9 +925,11 @@ public class RunPanel : BasePanel
             Panel frame = new Panel();
             frame.Position = new Vector2(x, 78f);
             frame.Size = new Vector2(130f, 150f);
+            // 边框粗细恒定 2px：Godot 的 border 是**向内**画的，1px↔3px 会让卡里的文字整体位移 2px，
+            // 点选时看起来像「卡片跳了一下」。选中只换颜色。
             Color border = picked ? UiKit.Gold : new Color(0.300f, 0.250f, 0.180f);
             frame.AddThemeStyleboxOverride("panel",
-                UiKit.Box(new Color(0.105f, 0.092f, 0.074f), border, picked ? 3 : 1, 3));
+                UiKit.Box(new Color(0.105f, 0.092f, 0.074f), border, 2, 3));
             _body.AddChild(frame);
 
             Label name = UiKit.MakeLabel(card.CardName, 15, UiKit.Paper);
@@ -1184,7 +1194,7 @@ public class RunPanel : BasePanel
             frame.Size = new Vector2(144f, 76f);
             frame.AddThemeStyleboxOverride("panel",
                 UiKit.Box(new Color(0.105f, 0.092f, 0.074f),
-                    picked ? UiKit.Gold : new Color(0.300f, 0.250f, 0.180f), picked ? 3 : 1, 3));
+                    picked ? UiKit.Gold : new Color(0.300f, 0.250f, 0.180f), 2, 3));
             _body.AddChild(frame);
 
             Label name = UiKit.MakeLabel(card.CardName, 14, UiKit.Paper);
