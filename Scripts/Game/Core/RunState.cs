@@ -39,8 +39,9 @@ public sealed class RunState
     /// <summary>等级上限。15 天 × 每天约 1 级，留一级余量。</summary>
     public const int MaxLevel = 15;
 
-    /// <summary>2 合 1 的手续费。合成是纯增益，收一点钱让它成为硬 sink。</summary>
-    public const int MergeCost = 15;
+    // 花钱的 2 合 1 已删除（2026-11-27）：升阶只有两条路 ——
+    // ① 再获得同名卡（AddCard 自动升阶，拾取/购买都算）；② 百炼台的「合成」选项（两张数值相加）。
+    // 留着「花 15 两点一下」只会让玩家问：为什么我要为自动发生的事付钱？
 
     /// <summary>删牌服务单价与一局上限。</summary>
     public const int RemoveServiceCost = 60;
@@ -667,87 +668,6 @@ public sealed class RunState
             }
         }
         return count;
-    }
-
-    /// <summary>牌组里所有「够 2 张同阶、且没到钻」的卡，供合成界面列出来。</summary>
-    public List<RunCard> MergeableCards()
-    {
-        List<RunCard> result = new List<RunCard>();
-        List<int> seen = new List<int>();
-
-        for (int i = 0; i < Deck.Count; i++)
-        {
-            RunCard card = Deck[i];
-            if (!CardTierRules.CanMerge(card.Tier))
-            {
-                continue;
-            }
-            if (CountOf(card.CardId, card.Tier) < CardTierRules.MergeCount)
-            {
-                continue;
-            }
-
-            // 同 id 同阶只列出一张当代表
-            bool listed = false;
-            for (int k = 0; k < seen.Count; k++)
-            {
-                if (seen[k] == card.CardId * 10 + (int)card.Tier)
-                {
-                    listed = true;
-                    break;
-                }
-            }
-            if (listed)
-            {
-                continue;
-            }
-
-            seen.Add(card.CardId * 10 + (int)card.Tier);
-            result.Add(card);
-        }
-        return result;
-    }
-
-    /// <summary>2 合 1：消耗两张同名同阶 + 15 银两，产出一张高一阶（换的是 CardId）。</summary>
-    public bool TryMerge(int cardId, CardTier tier)
-    {
-        if (!CardTierRules.CanMerge(tier))
-        {
-            return false;
-        }
-        if (CountOf(cardId, tier) < CardTierRules.MergeCount)
-        {
-            return false;
-        }
-        if (!Spend(MergeCost))
-        {
-            return false;
-        }
-
-        int removed = 0;
-        for (int i = Deck.Count - 1; i >= 0; i--)
-        {
-            if (removed >= CardTierRules.MergeCount)
-            {
-                break;
-            }
-            if (Deck[i].NoUpgrade)
-            {
-                continue;
-            }
-            if (Deck[i].CardId == cardId && Deck[i].Tier == tier)
-            {
-                Deck.RemoveAt(i);
-                removed++;
-            }
-        }
-
-        int nextId = CardTierRules.TierIdOf(CardTierRules.BaseIdOf(cardId), CardTierRules.Next(tier));
-        RunCard merged = new RunCard(nextId, CardTierRules.Next(tier));
-        Deck.Add(merged);
-        Notes.Add("合成 " + merged.DisplayName + "（消耗 2 张" + CardTierRules.Name(tier) + "阶同名卡，" +
-            MergeCost + " 银两）");
-        return true;
     }
 
     /// <summary>删牌服务还能不能买。</summary>

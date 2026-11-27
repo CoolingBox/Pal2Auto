@@ -279,29 +279,14 @@ public static class RunSimulator
         return worstIndex;
     }
 
-    /// <summary>牌组里有能合的就一直合，返回合并次数。</summary>
+    /// <summary>
+    /// 花钱的 2 合 1 已取消（2026-11-27）：升阶只靠「再获得同名卡」与百炼台的合成选项，
+    /// 模拟器不再执行这个动作，返回 0 只为不破坏调用处。
+    /// </summary>
     private static int MergeEverything(RunState state)
     {
-        int total = 0;
-        bool merged = true;
-        int guard = 0;
-        while (merged && guard < 50)
-        {
-            guard++;
-            merged = false;
-            List<RunCard> list = state.MergeableCards();
-            for (int i = 0; i < list.Count; i++)
-            {
-                if (state.TryMerge(list[i].CardId, list[i].Tier))
-                {
-                    merged = true;
-                    total++;
-                }
-            }
-        }
-        return total;
+        return 0;
     }
-
     private static void Print(List<Result> results)
     {
         TinyLog.Info("RunLog", "=== 自动推演 " + results.Count + " 局，胜率参数 " + DefaultWinPercent + "% ===");

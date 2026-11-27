@@ -56,6 +56,10 @@ public static class DevShot
             {
                 OpenRunLater(host, "forge");
             }
+            if (all[i] == "--ui=runresume")
+            {
+                OpenRunLater(host, "resume");
+            }
             if (all[i] == "--ui=rundeck")
             {
                 OpenDeckOnStart = true;
@@ -368,22 +372,38 @@ public static class DevShot
             run.Current.Day = dayOverride;
         }
 
-        // --deckmerge=1 找两张同名同阶合掉，打印前后阶位分布（验牌组抽屉的合成）
+        // 从存档读一局，打印关键状态（验存档是否真的能续上）：--ui=runresume
+        if (mode == "resume")
+        {
+            RunManager mgr = RunManager.Instance;
+            GD.Print("RESUME 有存档=" + mgr.HasSaveOnDisk());
+            bool ok = mgr.LoadRun();
+            if (ok)
+            {
+                RunState st = mgr.Current;
+                GD.Print("RESUME 读取成功：主角 " + st.CharacterId + " 第 " + st.Day + " 天，" +
+                    "银两 " + st.Gold + "，牌组 " + st.Deck.Count + " 张，胜 " + st.Victories);
+            }
+            else
+            {
+                GD.Print("RESUME 读取失败");
+            }
+            System.Console.Out.Flush();
+            host.GetTree().Quit(0);
+            return;
+        }
+
+        // --deckmerge=1 再获得一张同名卡，验「自动升阶」，打印前后阶位分布（验牌组抽屉的合成）
         if (ReadIntArg("--deckmerge=", 0) > 0)
         {
             RunState st = run.Current;
-            List<RunCard> mergeable = st.MergeableCards();
-            GD.Print("DECK 合成前 " + st.Deck.Count + " 张，可合成 " + mergeable.Count + " 组");
-            if (mergeable.Count > 0)
-            {
-                RunCard first = mergeable[0];
-                RunCard second = mergeable[1];
-                GD.Print("DECK 目标：" + first.CardName + "（" + CardTierRules.Name(first.Tier) + "）x2");
-                bool ok = st.TryMerge(first.CardId, first.Tier);
-                GD.Print("DECK 合成=" + ok + " → " + st.Deck.Count + " 张");
-                string last = st.Notes.Count > 0 ? st.Notes[st.Notes.Count - 1] : "";
-                GD.Print("DECK 记录：" + last);
-            }
+            RunCard first = st.Deck[0];
+            GD.Print("DECK 之前 " + st.Deck.Count + " 张，首张 " + first.DisplayName);
+            // 再获得一张同名同阶（模拟拾取/购买）
+            st.AddCard(new RunCard(first.CardId, first.Tier));
+            GD.Print("DECK 之后 " + st.Deck.Count + " 张，首张 " + st.Deck[0].DisplayName);
+            string last = st.Notes.Count > 0 ? st.Notes[st.Notes.Count - 1] : "";
+            GD.Print("DECK 记录：" + last);
             System.Console.Out.Flush();
             host.GetTree().Quit(0);
             return;

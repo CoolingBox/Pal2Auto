@@ -47,8 +47,6 @@ public class RunPanel : BasePanel
     /// <summary>牌组抽屉开着没有。</summary>
     private bool _deckOpen;
 
-    /// <summary>牌组抽屉里点选的牌（合成用，最多 2 张）。</summary>
-    private readonly List<RunCard> _deckPicked = new List<RunCard>();
 
     public override void OnBind(Control control)
     {
@@ -149,7 +147,6 @@ public class RunPanel : BasePanel
         deckButton.Pressed += () =>
         {
             _deckOpen = !_deckOpen;
-            _deckPicked.Clear();
             Refresh();
         };
         _root.AddChild(deckButton);
@@ -183,9 +180,7 @@ public class RunPanel : BasePanel
         RefreshPips(state);
         BuildBody(state, phase);
 
-        int mergeable = state.MergeableCards().Count;
-        _foot.Text = "牌组 " + state.Deck.Count + " 张" +
-            (mergeable > 0 ? "　可合成 " + mergeable + " 组（2 张同名同阶 → 高一阶）" : "") +
+        _foot.Text = "牌组 " + state.Deck.Count + " 张（再获得同名卡会自动升阶）" +
             "　·　阅历 " + state.Level + " 级（" + state.Experience + "/" + RunState.ExpPerLevel + "）";
     }
 
@@ -470,7 +465,7 @@ public class RunPanel : BasePanel
         remove.Pressed += OnOpenRemoval;
         _body.AddChild(remove);
 
-        Label note = UiKit.MakeLabel("合成：两张同名同阶 + " + RunState.MergeCost + " 银两 → 一张高一阶",
+        Label note = UiKit.MakeLabel("升阶：再获得一张同名卡就自动升一阶（不需要花钱）",
             11, UiKit.Dim);
         UiKit.Place(note, 0f, 326f, W, 22f, HorizontalAlignment.Center);
         _body.AddChild(note);
@@ -670,6 +665,7 @@ public class RunPanel : BasePanel
         }
         if (state.BuyOffer(index))
         {
+            RunManager.Instance.SaveRun();
             Refresh();
         }
     }
@@ -1022,6 +1018,7 @@ public class RunPanel : BasePanel
         if (ok)
         {
             _forgePicked.Clear();
+            RunManager.Instance.SaveRun();
         }
         Refresh();
     }
@@ -1047,25 +1044,18 @@ public class RunPanel : BasePanel
         close.Pressed += () =>
         {
             _deckOpen = false;
-            _deckPicked.Clear();
             Refresh();
         };
         mask.AddChild(close);
 
-        // 左下角合成
-        bool canMerge = CanMergePicked();
-        Button merge = UiKit.MakeButton(
-            canMerge ? "合成（" + RunState.MergeCost + " 银两）" : "选 2 张同名同阶", true);
-        merge.Position = new Vector2(20f, 6f);
-        merge.Size = new Vector2(200f, 28f);
-        merge.Disabled = !canMerge;
-        merge.Pressed += OnDeckMerge;
-        mask.AddChild(merge);
+        // 左下角说明：花钱的合成已经取消，升阶只靠「再获得同名卡」或百炼台
+        Label mergeNote = UiKit.MakeLabel("再获得同名卡即升阶", 11, UiKit.PaperDim);
+        UiKit.Place(mergeNote, 20f, 10f, 240f, 20f, HorizontalAlignment.Left);
+        mask.AddChild(mergeNote);
 
         for (int i = 0; i < state.Deck.Count && i < 30; i++)
         {
             RunCard card = state.Deck[i];
-            bool picked = _deckPicked.Contains(card);
             int col = i % 6;
             int row = i / 6;
             float x = 40f + col * 148f;
@@ -1074,9 +1064,8 @@ public class RunPanel : BasePanel
             Panel frame = new Panel();
             frame.Position = new Vector2(x, y);
             frame.Size = new Vector2(140f, 72f);
-            Color border = picked ? UiKit.Gold : new Color(0.280f, 0.230f, 0.170f);
             frame.AddThemeStyleboxOverride("panel",
-                UiKit.Box(new Color(0.105f, 0.092f, 0.074f), border, picked ? 2 : 1, 2));
+                UiKit.Box(new Color(0.105f, 0.092f, 0.074f), new Color(0.280f, 0.230f, 0.170f), 1, 2));
             mask.AddChild(frame);
 
             Label name = UiKit.MakeLabel(card.CardName, 13, UiKit.Paper);
@@ -1121,13 +1110,6 @@ public class RunPanel : BasePanel
             UiKit.Place(cd, 4f, 54f, 132f, 14f, HorizontalAlignment.Left);
             frame.AddChild(cd);
 
-            RunCard target = card;
-            Button hit = new Button();
-            hit.Flat = true;
-            hit.Position = Vector2.Zero;
-            hit.Size = new Vector2(140f, 72f);
-            hit.Pressed += () => OnDeckPick(target);
-            frame.AddChild(hit);
         }
 
         if (state.Deck.Count > 30)
@@ -1136,51 +1118,6 @@ public class RunPanel : BasePanel
             UiKit.Place(more, 0f, H - 92f, W, 18f, HorizontalAlignment.Center);
             mask.AddChild(more);
         }
-    }
-
-    private void OnDeckPick(RunCard card)
-    {
-        if (_deckPicked.Contains(card))
-        {
-            _deckPicked.Remove(card);
-        }
-        else
-        {
-            if (_deckPicked.Count >= 2)
-            {
-                _deckPicked.RemoveAt(0);
-            }
-            _deckPicked.Add(card);
-        }
-        Refresh();
-    }
-
-    private bool CanMergePicked()
-    {
-        if (_deckPicked.Count != 2)
-        {
-            return false;
-        }
-        RunCard a = _deckPicked[0];
-        RunCard b = _deckPicked[1];
-        if (a == b || a.NoUpgrade || b.NoUpgrade)
-        {
-            return false;
-        }
-        return a.CardId == b.CardId && a.Tier == b.Tier && CardTierRules.CanMerge(a.Tier);
-    }
-
-    private void OnDeckMerge()
-    {
-        if (!CanMergePicked())
-        {
-            return;
-        }
-        RunState state = RunManager.Instance.Current;
-        RunCard a = _deckPicked[0];
-        state.TryMerge(a.CardId, a.Tier);
-        _deckPicked.Clear();
-        Refresh();
     }
 
     /// <summary>淬炉：每天免费给一张牌附魔（锋锐 / 疾风 / 厚土 / 蚀骨），一卡只能一个。</summary>
@@ -1293,6 +1230,7 @@ public class RunPanel : BasePanel
                 if (state.ApplyEnchant(_enchantPicked, type))
                 {
                     _enchantPicked = null;
+                    RunManager.Instance.SaveRun();
                 }
                 Refresh();
             };

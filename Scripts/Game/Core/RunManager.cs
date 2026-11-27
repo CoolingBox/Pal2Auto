@@ -58,9 +58,16 @@ public sealed class RunManager : Singleton<RunManager>
             return;
         }
 
+        // 百炼台的候选是「Deck 里的引用」，序列化会变成副本、读档后与牌组脱钩。
+        // 所以存档时把它摘掉 —— 读档后重回奇遇时辰会重新 roll，玩家不会丢东西。
+        ForgeEvent pending = Current.PendingForge;
+        Current.PendingForge = null;
+
         RunSave save = new RunSave();
         save.Run = Current;
         SaveManager.Save(save);
+
+        Current.PendingForge = pending;
     }
 
     public bool LoadRun()
@@ -125,6 +132,7 @@ public sealed class RunManager : Singleton<RunManager>
             Current.Shop.Open(Current.Day, Current.CharacterId, Current.Rng);
             Current.Notes.Add("进了" + Current.Shop.ShopName);
         }
+        SaveRun();
         return true;
     }
 
@@ -171,6 +179,7 @@ public sealed class RunManager : Singleton<RunManager>
 
         if (Current.IsOver)
         {
+            SaveRun();
             return false;
         }
 
@@ -178,6 +187,9 @@ public sealed class RunManager : Singleton<RunManager>
         {
             AdvanceDay();
         }
+
+        // 每个时辰结算完落一次盘：退出游戏不丢进度
+        SaveRun();
         return !Current.IsOver;
     }
 

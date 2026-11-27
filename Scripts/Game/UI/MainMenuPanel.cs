@@ -122,28 +122,45 @@ public class MainMenuPanel : BasePanel
         UiKit.Place(subtitle, 110f, 148f, 420f, 24f);
         _root.AddChild(subtitle);
 
-        Button start = UiKit.MakeButton("开 局", true);
-        start.Position = new Vector2(56f, 210f);
-        start.Size = new Vector2(216f, 52f);
-        start.AddThemeFontSizeOverride("font_size", 22);
+        // 有存档时「继 续」占主按钮位，「开 局」降为普通按钮（开新局会覆盖进度，得让位）
+        bool hasSave = RunManager.Instance.HasSaveOnDisk();
+        float buttonY = 210f;
+
+        if (hasSave)
+        {
+            Button resume = UiKit.MakeButton("继 续", true);
+            resume.Position = new Vector2(56f, buttonY);
+            resume.Size = new Vector2(216f, 52f);
+            resume.AddThemeFontSizeOverride("font_size", 22);
+            resume.Pressed += OnResumePressed;
+            _root.AddChild(resume);
+            buttonY += 66f;
+        }
+
+        Button start = UiKit.MakeButton("开 局", !hasSave);
+        start.Position = new Vector2(56f, buttonY);
+        start.Size = new Vector2(216f, hasSave ? 40f : 52f);
+        start.AddThemeFontSizeOverride("font_size", hasSave ? 18 : 22);
         start.Pressed += OnStartPressed;
         _root.AddChild(start);
+        buttonY += hasSave ? 50f : 66f;
 
         Button settings = UiKit.MakeButton("设 置", false);
-        settings.Position = new Vector2(56f, 276f);
+        settings.Position = new Vector2(56f, buttonY);
         settings.Size = new Vector2(216f, 40f);
         settings.Pressed += OnSettingsPressed;
         _root.AddChild(settings);
 
         Button quit = UiKit.MakeButton("离 开", false);
-        quit.Position = new Vector2(56f, 326f);
+        quit.Position = new Vector2(56f, buttonY + 50f);
         quit.Size = new Vector2(216f, 40f);
         quit.Pressed += OnQuitPressed;
         _root.AddChild(quit);
 
         Label hint = UiKit.MakeLabel("选一位侠客，决定开局携带的那件家伙。\n摆摊与打擂还在施工中。",
             12, UiKit.Dim);
-        UiKit.Place(hint, 56f, 378f, 300f, 46f);
+        // 跟在按钮下面走：有存档时按钮多一排，写死坐标会压到「离开」上
+        UiKit.Place(hint, 56f, buttonY + 104f, 300f, 46f);
         hint.AutowrapMode = TextServer.AutowrapMode.Arbitrary;
         hint.VerticalAlignment = VerticalAlignment.Top;
         _root.AddChild(hint);
@@ -153,6 +170,19 @@ public class MainMenuPanel : BasePanel
             11, new Color(0.560f, 0.500f, 0.410f));
         UiKit.Place(footer, 24f, 512f, 700f, 20f);
         _root.AddChild(footer);
+    }
+
+    private void OnResumePressed()
+    {
+        AudioManager.PlayUISFX("ui_open");
+        if (!RunManager.Instance.LoadRun())
+        {
+            return;
+        }
+        GameFlow.InRun = true;
+        GameFlow.SelectedCharacterId = RunManager.Instance.Current.CharacterId;
+        UIManager.ShowPanel<RunPanel>();
+        UIManager.HidePanel<MainMenuPanel>();
     }
 
     private void OnStartPressed()
