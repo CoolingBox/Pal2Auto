@@ -868,6 +868,23 @@ public class RunPanel : BasePanel
 
     // —————————————————————— 占位与结算 ——————————————————————
 
+    /// <summary>
+    /// 去掉按钮自带的描边。面板本身已经有框（卡片 1px、选项框 1px、选中 3px），
+    /// 按钮再带一圈更亮的边（0.42 vs 卡片 0.30），视觉上就成了「框里套一个更亮的框」，
+    /// 看起来和周围不搭 —— 这里只留填充色，用明度差表达可点击。
+    /// </summary>
+    private static void FlattenButton(Button button)
+    {
+        button.AddThemeStyleboxOverride("normal",
+            UiKit.Box(new Color(0.180f, 0.160f, 0.135f), new Color(0f, 0f, 0f, 0f), 0, 4));
+        button.AddThemeStyleboxOverride("hover",
+            UiKit.Box(new Color(0.240f, 0.210f, 0.170f), new Color(0f, 0f, 0f, 0f), 0, 4));
+        button.AddThemeStyleboxOverride("pressed",
+            UiKit.Box(new Color(0.130f, 0.115f, 0.100f), new Color(0f, 0f, 0f, 0f), 0, 4));
+        button.AddThemeStyleboxOverride("disabled",
+            UiKit.Box(new Color(0.140f, 0.130f, 0.115f), new Color(0f, 0f, 0f, 0f), 0, 4));
+    }
+
     /// <summary>百炼台：上方 5 张候选（点选），下方 3 个选项。</summary>
     private void BuildRunEvent(RunState state, DayPhase phase)
     {
@@ -922,10 +939,11 @@ public class RunPanel : BasePanel
             frame.AddChild(cd);
 
             RunCard target = card;
-            Button pickButton = UiKit.MakeButton(picked ? "已　定" : "选　定", false);
+            Button pickButton = UiKit.MakeButton(picked ? "已定" : "选定", false);
             pickButton.Position = new Vector2(15f, 100f);
             pickButton.Size = new Vector2(100f, 32f);
             pickButton.Disabled = runEvent.Resolved;
+            FlattenButton(pickButton);
             pickButton.Pressed += () => OnEventPick(target);
             frame.AddChild(pickButton);
         }
@@ -955,10 +973,11 @@ public class RunPanel : BasePanel
             box.AddChild(optDesc);
 
             EventOption picked = option;
-            Button apply = UiKit.MakeButton("取　用", false);
+            Button apply = UiKit.MakeButton("取用", false);
             apply.Position = new Vector2(50f, 64f);
             apply.Size = new Vector2(100f, 26f);
             apply.Disabled = runEvent.Resolved;
+            FlattenButton(apply);
             apply.Pressed += () => OnEventApply(picked);
             box.AddChild(apply);
         }
@@ -1178,9 +1197,10 @@ public class RunPanel : BasePanel
             frame.AddChild(tier);
 
             RunCard target = card;
-            Button pick = UiKit.MakeButton(picked ? "已　定" : "选　定", false);
+            Button pick = UiKit.MakeButton(picked ? "已定" : "选定", false);
             pick.Position = new Vector2(22f, 46f);
             pick.Size = new Vector2(100f, 24f);
+            FlattenButton(pick);
             pick.Pressed += () =>
             {
                 _enchantPicked = target;
@@ -1225,6 +1245,7 @@ public class RunPanel : BasePanel
             apply.Position = new Vector2(38f, 54f);
             apply.Size = new Vector2(100f, 28f);
             apply.Disabled = state.FreeEnchantUsed || _enchantPicked == null;
+            FlattenButton(apply);
             apply.Pressed += () =>
             {
                 if (state.ApplyEnchant(_enchantPicked, type))
