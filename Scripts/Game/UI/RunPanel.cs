@@ -922,7 +922,7 @@ public class RunPanel : BasePanel
             frame.AddChild(cd);
 
             RunCard target = card;
-            Button pickButton = UiKit.MakeButton(picked ? "已选" : "选它", false);
+            Button pickButton = UiKit.MakeButton(picked ? "已　定" : "选　定", false);
             pickButton.Position = new Vector2(15f, 100f);
             pickButton.Size = new Vector2(100f, 32f);
             pickButton.Disabled = runEvent.Resolved;
@@ -955,7 +955,7 @@ public class RunPanel : BasePanel
             box.AddChild(optDesc);
 
             EventOption picked = option;
-            Button apply = UiKit.MakeButton("选它", false);
+            Button apply = UiKit.MakeButton("取　用", false);
             apply.Position = new Vector2(50f, 64f);
             apply.Size = new Vector2(100f, 26f);
             apply.Disabled = runEvent.Resolved;
@@ -1178,7 +1178,7 @@ public class RunPanel : BasePanel
             frame.AddChild(tier);
 
             RunCard target = card;
-            Button pick = UiKit.MakeButton(picked ? "已选" : "选它", false);
+            Button pick = UiKit.MakeButton(picked ? "已　定" : "选　定", false);
             pick.Position = new Vector2(22f, 46f);
             pick.Size = new Vector2(100f, 24f);
             pick.Pressed += () =>
