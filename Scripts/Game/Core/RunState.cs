@@ -364,6 +364,9 @@ public sealed class RunState
     /// <summary>当前时辰的「百炼台」现场（奇遇时辰打开）。</summary>
     public ForgeEvent PendingForge;
 
+    /// <summary>今天的免费附魔用掉了没有（淬炉每天一次）。</summary>
+    public bool FreeEnchantUsed;
+
     private Random _rng;
 
     /// <summary>随机源。读档后按 Seed 重建，不序列化。</summary>
@@ -890,6 +893,75 @@ public sealed class RunState
         }
     }
 
+    // —————————————————————— 淬炉（免费附魔）——————————————————————
+
+    /// <summary>这张牌现在能不能被附魔：今天还有免费次数、且它本身没有附魔（一卡一附魔）。</summary>
+    public bool CanEnchant(RunCard card)
+    {
+        if (card == null || FreeEnchantUsed)
+        {
+            return false;
+        }
+        return card.Enchant == EnchantType.None;
+    }
+
+    /// <summary>给一张牌附魔。一天一次，吃掉免费次数。</summary>
+    public bool ApplyEnchant(RunCard card, EnchantType type)
+    {
+        if (!CanEnchant(card) || type == EnchantType.None)
+        {
+            return false;
+        }
+
+        card.Enchant = type;
+        card.BuffCount++;
+        FreeEnchantUsed = true;
+        Notes.Add("淬炉：给「" + card.CardName + "」附上「" + EnchantName(type) + "」");
+        return true;
+    }
+
+    public static string EnchantName(EnchantType type)
+    {
+        if (type == EnchantType.Sharp)
+        {
+            return "锋锐";
+        }
+        if (type == EnchantType.Swift)
+        {
+            return "疾风";
+        }
+        if (type == EnchantType.Sturdy)
+        {
+            return "厚土";
+        }
+        if (type == EnchantType.Venom)
+        {
+            return "蚀骨";
+        }
+        return "未附魔";
+    }
+
+    public static string EnchantDesc(EnchantType type)
+    {
+        if (type == EnchantType.Sharp)
+        {
+            return "伤害 +25%";
+        }
+        if (type == EnchantType.Swift)
+        {
+            return "蓄势 -15%";
+        }
+        if (type == EnchantType.Sturdy)
+        {
+            return "护体 +2";
+        }
+        if (type == EnchantType.Venom)
+        {
+            return "中毒 +1";
+        }
+        return "";
+    }
+
     // —————————————————————— 百炼台（奇遇）——————————————————————
 
     /// <summary>开一场百炼台：抽 5 张候选 + 3 个随机选项。同一时辰不重复 roll。</summary>
@@ -942,7 +1014,11 @@ public sealed class RunState
         list.Add(MakeOption(ForgeOptionKind.Bottom, "后发", "选 1 张：洗牌后沉到牌库底", 1, 0));
         list.Add(MakeOption(ForgeOptionKind.Multi, "多动", "选 1 张：多重 +1，蓄势 +1 秒", 1, 0));
         list.Add(MakeOption(ForgeOptionKind.QuickDraw, "快枪", "选 1 张：蓄势 -1 秒，但数值减半", 1, 0));
-        list.Add(MakeOption(ForgeOptionKind.Greed, "贪婪", "牌库塞一张铜阶基础卡（永不升级），另得 40 银两", 0, 40));
+        // 定价模型（2026-11-26）：塞一张永久废卡的代价 + 占掉一个选项位的机会成本。
+        //   废卡稀释牌组 ≈ 20~40 两（一张铜卡市价 20，但多一张废卡要摊薄关键卡）；
+        //   选项位的替代价值 ≈ 40~60 两（合成省的删牌费 60、锋利 +2 伤折算 20）。
+        //   合计 60~100，取 80：这是「用牌组健康换现钱」的交易，不能是「塞垃圾还倒赚」。
+        list.Add(MakeOption(ForgeOptionKind.Greed, "贪婪", "牌库塞一张铜阶基础卡（永不升级），另得 80 银两", 0, 80));
         list.Add(MakeOption(ForgeOptionKind.Transcribe, "抄录", "选 1 张：复制一张同阶同名卡进牌库", 1, 0));
         return list;
     }
@@ -1097,7 +1173,8 @@ public sealed class RunState
             RunCard filler = new RunCard(fillerId, CardTier.Copper);
             filler.NoUpgrade = true;   // 锁死：这张卡永远升不了阶，也合不了
             Deck.Add(filler);
-            Notes.Add("百炼：贪婪，牌库多了一张「" + CardTierRules.Name(CardTier.Copper) + "阶基础卡」");
+            Notes.Add("百炼：贪婪，牌库多了一张「" + filler.CardName + "」（永不升级），+" +
+                option.Gold + " 银两");
         }
 
         if (option.Gold > 0)

@@ -260,6 +260,7 @@ public sealed class RunManager : Singleton<RunManager>
         int salary = Current.DaySalary;
         Current.Earn(salary);
 
+        Current.FreeEnchantUsed = false;
         Current.Shop.ResetForNewDay();
         Current.Shop.FreeRefreshCount = Current.FreeRefreshPerDay;
         Current.Shop.Open(Current.Day, Current.CharacterId, Current.Rng);

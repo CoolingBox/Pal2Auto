@@ -60,7 +60,9 @@ public static class CardTierRules
 
     public static int TierIdOf(int baseId, CardTier tier)
     {
-        return baseId + TierIdStep * (int)tier;
+        // 注意：CardTier 枚举是 Copper=1 / Silver=2 / Gold=3 / Diamond=4（不是 0~3），
+        // 而 id 区间是 0/1000/2000/3000 —— 换算时必须减 1，否则铜卡升阶会直接跳到金。
+        return baseId + TierIdStep * ((int)tier - 1);
     }
 
     public static int BaseIdOf(int cardId)
@@ -79,7 +81,8 @@ public static class CardTierRules
         {
             rank = 3;
         }
-        return (CardTier)rank;
+        // rank 是 0~3，CardTier 是 1~4
+        return (CardTier)(rank + 1);
     }
 
     public static string Name(CardTier tier)

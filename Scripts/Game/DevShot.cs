@@ -52,6 +52,15 @@ public static class DevShot
             {
                 OpenRunLater(host, "event");
             }
+            if (all[i] == "--ui=runforge")
+            {
+                OpenRunLater(host, "forge");
+            }
+            if (all[i] == "--ui=rundeck")
+            {
+                OpenDeckOnStart = true;
+                OpenRunLater(host, "shop");
+            }
             if (all[i] == "--ui=runfight")
             {
                 OpenRunLater(host, "fight");
@@ -359,6 +368,59 @@ public static class DevShot
             run.Current.Day = dayOverride;
         }
 
+        // --deckmerge=1 找两张同名同阶合掉，打印前后阶位分布（验牌组抽屉的合成）
+        if (ReadIntArg("--deckmerge=", 0) > 0)
+        {
+            RunState st = run.Current;
+            List<RunCard> mergeable = st.MergeableCards();
+            GD.Print("DECK 合成前 " + st.Deck.Count + " 张，可合成 " + mergeable.Count + " 组");
+            if (mergeable.Count > 0)
+            {
+                RunCard first = mergeable[0];
+                RunCard second = mergeable[1];
+                GD.Print("DECK 目标：" + first.CardName + "（" + CardTierRules.Name(first.Tier) + "）x2");
+                bool ok = st.TryMerge(first.CardId, first.Tier);
+                GD.Print("DECK 合成=" + ok + " → " + st.Deck.Count + " 张");
+                string last = st.Notes.Count > 0 ? st.Notes[st.Notes.Count - 1] : "";
+                GD.Print("DECK 记录：" + last);
+            }
+            System.Console.Out.Flush();
+            host.GetTree().Quit(0);
+            return;
+        }
+
+        // --enchtest=1 给第一张牌附魔，打印数值变化（验淬炉是否真的改数值）
+        if (ReadIntArg("--enchtest=", 0) > 0)
+        {
+            RunState st = run.Current;
+            RunCard card = st.Deck[0];
+            GD.Print("ENCH 前 " + card.CardName + " 攻 " + card.Damage + " 护 " + card.Shield +
+                " 蓄 " + card.Countdown.ToString("0.00"));
+            bool ok = st.ApplyEnchant(card, EnchantType.Sharp);
+            GD.Print("ENCH 锋锐 成功=" + ok + " → 攻 " + card.Damage + "（已用免费次数=" + st.FreeEnchantUsed + "）");
+
+            RunCard guard = null;
+            for (int i = 0; i < st.Deck.Count; i++)
+            {
+                if (st.Deck[i].Shield > 0)
+                {
+                    guard = st.Deck[i];
+                    break;
+                }
+            }
+            if (guard != null)
+            {
+                st.FreeEnchantUsed = false;   // 调试：绕过一天一次
+                int beforeShield = guard.Shield;
+                st.ApplyEnchant(guard, EnchantType.Sturdy);
+                GD.Print("ENCH 厚土 " + guard.CardName + " 护 " + beforeShield + " → " + guard.Shield);
+            }
+
+            System.Console.Out.Flush();
+            host.GetTree().Quit(0);
+            return;
+        }
+
         // --forgestat=N 连开 N 次百炼台，统计每个选项的出现频率（验权重）
         int forgeStat = ReadIntArg("--forgestat=", 0);
         if (forgeStat > 0)
@@ -439,6 +501,7 @@ public static class DevShot
                 {
                     opt.Kind = ForgeOptionKind.Greed;
                     opt.TargetCount = 0;
+                    opt.Gold = 80;
                 }
                 else if (forgeAct == "exile")
                 {
@@ -456,7 +519,7 @@ public static class DevShot
                 bool ok = st.ApplyForgeOption(opt, targets);
                 string lastNote = st.Notes.Count > 0 ? st.Notes[st.Notes.Count - 1] : "（无记录）";
                 GD.Print("FORGE " + forgeAct + " 成功=" + ok + "，牌库 " + st.Deck.Count + " 张");
-                GD.Print("FORGE 记录：" + lastNote);
+                GD.Print("FORGE 记录：" + lastNote + "（现有银两 " + st.Gold + "）");
                 if (ok && st.Deck.Count > 0)
                 {
                     RunCard shown = st.Deck[0];
@@ -473,6 +536,10 @@ public static class DevShot
         else if (mode == "event")
         {
             run.SelectFreePhase(PhaseType.Event);
+        }
+        else if (mode == "forge")
+        {
+            run.SelectFreePhase(PhaseType.Forge);
         }
         else if (mode == "remove")
         {
@@ -578,6 +645,9 @@ public static class DevShot
     }
 
     /// <summary>读 `--xxx=abc` 形式的字符串参数，缺省时返回 fallback。</summary>
+    /// <summary>--ui=rundeck 用：RunPanel 第一次刷新时把牌组抽屉打开。</summary>
+    public static bool OpenDeckOnStart;
+
     private static string ReadStringArg(string prefix, string fallback)
     {
         string[] args = OS.GetCmdlineArgs();

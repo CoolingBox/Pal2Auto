@@ -41,6 +41,15 @@ public class RunPanel : BasePanel
     /// <summary>百炼台里已经点选的牌（最多 2 张）。</summary>
     private readonly List<RunCard> _forgePicked = new List<RunCard>();
 
+    /// <summary>淬炉里点选的牌（附魔对象）。</summary>
+    private RunCard _enchantPicked;
+
+    /// <summary>牌组抽屉开着没有。</summary>
+    private bool _deckOpen;
+
+    /// <summary>牌组抽屉里点选的牌（合成用，最多 2 张）。</summary>
+    private readonly List<RunCard> _deckPicked = new List<RunCard>();
+
     public override void OnBind(Control control)
     {
         base.OnBind(control);
@@ -131,8 +140,19 @@ public class RunPanel : BasePanel
         _root.AddChild(_body);
 
         _foot = UiKit.MakeLabel("", 12, UiKit.PaperDim);
-        UiKit.Place(_foot, 24f, H - 34f, W - 48f, 24f);
+        UiKit.Place(_foot, 24f, H - 34f, W - 180f, 24f);
         _root.AddChild(_foot);
+
+        Button deckButton = UiKit.MakeButton("牌　组", false);
+        deckButton.Position = new Vector2(W - 128f, H - 38f);
+        deckButton.Size = new Vector2(104f, 28f);
+        deckButton.Pressed += () =>
+        {
+            _deckOpen = !_deckOpen;
+            _deckPicked.Clear();
+            Refresh();
+        };
+        _root.AddChild(deckButton);
     }
 
     // —————————————————————— 刷新 ——————————————————————
@@ -250,7 +270,7 @@ public class RunPanel : BasePanel
         }
         else if (phase.Type == PhaseType.Forge)
         {
-            BuildPlaceholder(phase);
+            BuildForgeShop(state, phase);
         }
         else if (phase.Type == PhaseType.Encounter || phase.Type == PhaseType.Nemesis)
         {
@@ -259,6 +279,17 @@ public class RunPanel : BasePanel
         else if (phase.Type == PhaseType.Passed)
         {
             BuildPassed(phase);
+        }
+
+        if (DevShot.OpenDeckOnStart)
+        {
+            DevShot.OpenDeckOnStart = false;
+            _deckOpen = true;
+        }
+
+        if (_deckOpen)
+        {
+            BuildDeckDrawer(state);
         }
     }
 
@@ -993,6 +1024,280 @@ public class RunPanel : BasePanel
             _forgePicked.Clear();
         }
         Refresh();
+    }
+
+    /// <summary>牌组抽屉：全屏列出牌组，可在这里 2 合 1。</summary>
+    private void BuildDeckDrawer(RunState state)
+    {
+        Panel mask = new Panel();
+        mask.Position = Vector2.Zero;
+        mask.Size = new Vector2(W, H - 56f);
+        mask.AddThemeStyleboxOverride("panel",
+            UiKit.Box(new Color(0.055f, 0.048f, 0.040f, 0.98f), new Color(0.300f, 0.250f, 0.180f), 1, 0));
+        _body.AddChild(mask);
+
+        Label title = UiKit.MakeLabel("牌　组（" + state.Deck.Count + " 张）", 20, UiKit.Gold);
+        UiKit.Place(title, 0f, 8f, W, 28f, HorizontalAlignment.Center);
+        mask.AddChild(title);
+
+        // 右上角关闭
+        Button close = UiKit.MakeButton("关　闭", false);
+        close.Position = new Vector2(W - 120f, 6f);
+        close.Size = new Vector2(100f, 28f);
+        close.Pressed += () =>
+        {
+            _deckOpen = false;
+            _deckPicked.Clear();
+            Refresh();
+        };
+        mask.AddChild(close);
+
+        // 左下角合成
+        bool canMerge = CanMergePicked();
+        Button merge = UiKit.MakeButton(
+            canMerge ? "合成（" + RunState.MergeCost + " 银两）" : "选 2 张同名同阶", true);
+        merge.Position = new Vector2(20f, 6f);
+        merge.Size = new Vector2(200f, 28f);
+        merge.Disabled = !canMerge;
+        merge.Pressed += OnDeckMerge;
+        mask.AddChild(merge);
+
+        for (int i = 0; i < state.Deck.Count && i < 30; i++)
+        {
+            RunCard card = state.Deck[i];
+            bool picked = _deckPicked.Contains(card);
+            int col = i % 6;
+            int row = i / 6;
+            float x = 40f + col * 148f;
+            float y = 44f + row * 78f;
+
+            Panel frame = new Panel();
+            frame.Position = new Vector2(x, y);
+            frame.Size = new Vector2(140f, 72f);
+            Color border = picked ? UiKit.Gold : new Color(0.280f, 0.230f, 0.170f);
+            frame.AddThemeStyleboxOverride("panel",
+                UiKit.Box(new Color(0.105f, 0.092f, 0.074f), border, picked ? 2 : 1, 2));
+            mask.AddChild(frame);
+
+            Label name = UiKit.MakeLabel(card.CardName, 13, UiKit.Paper);
+            UiKit.Place(name, 4f, 4f, 132f, 18f, HorizontalAlignment.Left);
+            frame.AddChild(name);
+
+            Label info = UiKit.MakeLabel(CardTierRules.Name(card.Tier) + "阶　" + CardStatLine(card),
+                11, TierColor(card.Tier));
+            UiKit.Place(info, 4f, 24f, 132f, 16f, HorizontalAlignment.Left);
+            frame.AddChild(info);
+
+            // 角标：附魔 / 事件改过 / 锁死
+            string marks = "";
+            if (card.Enchant != EnchantType.None)
+            {
+                marks += RunState.EnchantName(card.Enchant) + " ";
+            }
+            if (card.BuffCount > 0)
+            {
+                marks += "改" + card.BuffCount + " ";
+            }
+            if (card.NoUpgrade)
+            {
+                marks += "锁 ";
+            }
+            if (card.PriorityDraw)
+            {
+                marks += "先 ";
+            }
+            if (card.BottomOfDeck)
+            {
+                marks += "后 ";
+            }
+            if (marks.Length > 0)
+            {
+                Label mark = UiKit.MakeLabel(marks.Trim(), 10, UiKit.Vermilion);
+                UiKit.Place(mark, 4f, 42f, 132f, 14f, HorizontalAlignment.Left);
+                frame.AddChild(mark);
+            }
+
+            Label cd = UiKit.MakeLabel("蓄势 " + card.Countdown.ToString("0.0"), 11, UiKit.Dim);
+            UiKit.Place(cd, 4f, 54f, 132f, 14f, HorizontalAlignment.Left);
+            frame.AddChild(cd);
+
+            RunCard target = card;
+            Button hit = new Button();
+            hit.Flat = true;
+            hit.Position = Vector2.Zero;
+            hit.Size = new Vector2(140f, 72f);
+            hit.Pressed += () => OnDeckPick(target);
+            frame.AddChild(hit);
+        }
+
+        if (state.Deck.Count > 30)
+        {
+            Label more = UiKit.MakeLabel("（还有 " + (state.Deck.Count - 30) + " 张没显示）", 11, UiKit.Dim);
+            UiKit.Place(more, 0f, H - 92f, W, 18f, HorizontalAlignment.Center);
+            mask.AddChild(more);
+        }
+    }
+
+    private void OnDeckPick(RunCard card)
+    {
+        if (_deckPicked.Contains(card))
+        {
+            _deckPicked.Remove(card);
+        }
+        else
+        {
+            if (_deckPicked.Count >= 2)
+            {
+                _deckPicked.RemoveAt(0);
+            }
+            _deckPicked.Add(card);
+        }
+        Refresh();
+    }
+
+    private bool CanMergePicked()
+    {
+        if (_deckPicked.Count != 2)
+        {
+            return false;
+        }
+        RunCard a = _deckPicked[0];
+        RunCard b = _deckPicked[1];
+        if (a == b || a.NoUpgrade || b.NoUpgrade)
+        {
+            return false;
+        }
+        return a.CardId == b.CardId && a.Tier == b.Tier && CardTierRules.CanMerge(a.Tier);
+    }
+
+    private void OnDeckMerge()
+    {
+        if (!CanMergePicked())
+        {
+            return;
+        }
+        RunState state = RunManager.Instance.Current;
+        RunCard a = _deckPicked[0];
+        state.TryMerge(a.CardId, a.Tier);
+        _deckPicked.Clear();
+        Refresh();
+    }
+
+    /// <summary>淬炉：每天免费给一张牌附魔（锋锐 / 疾风 / 厚土 / 蚀骨），一卡只能一个。</summary>
+    private void BuildForgeShop(RunState state, DayPhase phase)
+    {
+        Label title = UiKit.MakeLabel("淬　炉", 22, UiKit.Gold);
+        UiKit.Place(title, 0f, 14f, W, 30f, HorizontalAlignment.Center);
+        _body.AddChild(title);
+
+        string hint = state.FreeEnchantUsed
+            ? "今日炉火已熄（每天免费一次），明天再来"
+            : "先点一张牌，再点下方附魔　·　一卡只能附一个";
+        Label hintLabel = UiKit.MakeLabel(hint, 12, UiKit.PaperDim);
+        UiKit.Place(hintLabel, 0f, 44f, W, 22f, HorizontalAlignment.Center);
+        _body.AddChild(hintLabel);
+
+        // 只列「还能附魔」的牌（已附魔的不显示，选了也没用）
+        List<RunCard> open = new List<RunCard>();
+        for (int i = 0; i < state.Deck.Count; i++)
+        {
+            if (state.Deck[i].Enchant == EnchantType.None)
+            {
+                open.Add(state.Deck[i]);
+            }
+        }
+
+        if (open.Count == 0)
+        {
+            Label none = UiKit.MakeLabel("牌组里已经没有能附魔的牌了", 14, UiKit.Dim);
+            UiKit.Place(none, 0f, 120f, W, 30f, HorizontalAlignment.Center);
+            _body.AddChild(none);
+        }
+
+        for (int i = 0; i < open.Count && i < 15; i++)
+        {
+            RunCard card = open[i];
+            bool picked = _enchantPicked == card;
+            int col = i % 5;
+            int row = i / 5;
+            float x = 108f + col * 152f;
+            float y = 74f + row * 84f;
+
+            Panel frame = new Panel();
+            frame.Position = new Vector2(x, y);
+            frame.Size = new Vector2(144f, 76f);
+            frame.AddThemeStyleboxOverride("panel",
+                UiKit.Box(new Color(0.105f, 0.092f, 0.074f),
+                    picked ? UiKit.Gold : new Color(0.300f, 0.250f, 0.180f), picked ? 3 : 1, 3));
+            _body.AddChild(frame);
+
+            Label name = UiKit.MakeLabel(card.CardName, 14, UiKit.Paper);
+            UiKit.Place(name, 0f, 6f, 144f, 20f, HorizontalAlignment.Center);
+            frame.AddChild(name);
+
+            Label tier = UiKit.MakeLabel(CardTierRules.Name(card.Tier) + "阶　" + CardStatLine(card),
+                11, TierColor(card.Tier));
+            UiKit.Place(tier, 0f, 26f, 144f, 18f, HorizontalAlignment.Center);
+            frame.AddChild(tier);
+
+            RunCard target = card;
+            Button pick = UiKit.MakeButton(picked ? "已选" : "选它", false);
+            pick.Position = new Vector2(22f, 46f);
+            pick.Size = new Vector2(100f, 24f);
+            pick.Pressed += () =>
+            {
+                _enchantPicked = target;
+                Refresh();
+            };
+            frame.AddChild(pick);
+        }
+
+        if (open.Count > 15)
+        {
+            Label more = UiKit.MakeLabel("（还有 " + (open.Count - 15) + " 张没显示）", 11, UiKit.Dim);
+            UiKit.Place(more, 0f, 330f, W, 18f, HorizontalAlignment.Center);
+            _body.AddChild(more);
+        }
+
+        EnchantType[] types =
+        {
+            EnchantType.Sharp, EnchantType.Swift, EnchantType.Sturdy, EnchantType.Venom,
+        };
+
+        for (int i = 0; i < types.Length; i++)
+        {
+            EnchantType type = types[i];
+            float x = 108f + i * 190f;
+
+            Panel box = new Panel();
+            box.Position = new Vector2(x, 352f);
+            box.Size = new Vector2(176f, 92f);
+            box.AddThemeStyleboxOverride("panel",
+                UiKit.Box(new Color(0.100f, 0.088f, 0.070f), UiKit.Gold, 1, 3));
+            _body.AddChild(box);
+
+            Label eName = UiKit.MakeLabel(RunState.EnchantName(type), 17, UiKit.Gold);
+            UiKit.Place(eName, 0f, 6f, 176f, 24f, HorizontalAlignment.Center);
+            box.AddChild(eName);
+
+            Label eDesc = UiKit.MakeLabel(RunState.EnchantDesc(type), 11, UiKit.PaperDim);
+            UiKit.Place(eDesc, 0f, 30f, 176f, 18f, HorizontalAlignment.Center);
+            box.AddChild(eDesc);
+
+            Button apply = UiKit.MakeButton("淬它", false);
+            apply.Position = new Vector2(38f, 54f);
+            apply.Size = new Vector2(100f, 28f);
+            apply.Disabled = state.FreeEnchantUsed || _enchantPicked == null;
+            apply.Pressed += () =>
+            {
+                if (state.ApplyEnchant(_enchantPicked, type))
+                {
+                    _enchantPicked = null;
+                }
+                Refresh();
+            };
+            box.AddChild(apply);
+        }
     }
 
     private void BuildPlaceholder(DayPhase phase)
