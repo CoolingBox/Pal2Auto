@@ -15,7 +15,7 @@
       122,
       138
     ],
-    "Nemesis": 138
+    "Nemesis": 140
   },
   {
     "Id": 3,
@@ -24,114 +24,114 @@
       135,
       158
     ],
-    "Nemesis": 158
+    "Nemesis": 165
   },
   {
     "Id": 4,
     "Encounter": [
-      136,
-      152,
-      184
+      200,
+      225,
+      252
     ],
-    "Nemesis": 184
+    "Nemesis": 258
   },
   {
     "Id": 5,
     "Encounter": [
-      152,
-      170,
-      212
+      200,
+      228,
+      255
     ],
-    "Nemesis": 212
+    "Nemesis": 262
   },
   {
     "Id": 6,
     "Encounter": [
-      167,
-      189,
-      239
+      204,
+      232,
+      260
     ],
-    "Nemesis": 239
+    "Nemesis": 268
   },
   {
     "Id": 7,
     "Encounter": [
-      184,
-      207,
-      271
+      212,
+      240,
+      268
     ],
-    "Nemesis": 271
+    "Nemesis": 276
   },
   {
     "Id": 8,
     "Encounter": [
-      200,
-      225,
-      294
+      229,
+      260,
+      291
     ],
-    "Nemesis": 294
+    "Nemesis": 299
   },
   {
     "Id": 9,
     "Encounter": [
-      216,
-      237,
-      317
+      242,
+      275,
+      308
     ],
-    "Nemesis": 317
+    "Nemesis": 316
   },
   {
     "Id": 10,
     "Encounter": [
-      230,
-      248,
-      350
+      255,
+      290,
+      325
     ],
-    "Nemesis": 350
+    "Nemesis": 334
   },
   {
     "Id": 11,
     "Encounter": [
-      239,
-      259,
-      366
+      268,
+      305,
+      342
     ],
-    "Nemesis": 366
+    "Nemesis": 351
   },
   {
     "Id": 12,
     "Encounter": [
-      248,
-      270,
-      383
+      282,
+      320,
+      358
     ],
-    "Nemesis": 383
+    "Nemesis": 368
   },
   {
     "Id": 13,
     "Encounter": [
-      258,
-      281,
-      399
+      295,
+      335,
+      375
     ],
-    "Nemesis": 399
+    "Nemesis": 385
   },
   {
     "Id": 14,
     "Encounter": [
-      267,
-      293,
-      416
+      306,
+      348,
+      390
     ],
-    "Nemesis": 416
+    "Nemesis": 400
   },
   {
     "Id": 15,
     "Encounter": [
-      276,
-      304,
-      432
+      317,
+      360,
+      403
     ],
-    "Nemesis": 432
+    "Nemesis": 414
   }
 ]
