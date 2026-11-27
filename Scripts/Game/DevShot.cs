@@ -272,8 +272,9 @@ public static class DevShot
                 battle.Player.PoisonStacks = startPoison;
             }
 
-            // --simstorm=1 打印力歇的头几跳，验证「起始 1 伤、每跳 +1」
-            bool traceStorm = ReadIntArg("--simstorm=", 0) > 0 || ReadIntArg("--simpoison=", 0) > 0;
+            // --simfatigue=1（旧名 --simstorm 仍可用）打印力歇的头几跳，验证「起始 1 伤、每跳 +1」
+            bool traceStorm = ReadIntArg("--simfatigue=", 0) > 0 || ReadIntArg("--simstorm=", 0) > 0
+                || ReadIntArg("--simpoison=", 0) > 0;
             int stormPrinted = 0;
             if (testPriority && battleCards.Count > 0)
             {

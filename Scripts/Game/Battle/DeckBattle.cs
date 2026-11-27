@@ -154,7 +154,7 @@ public sealed class FighterState
     public float PoisonDecay;
 
     // —— 疲劳（力歇）—— 每方独立计时，卡牌效果可以提前或延后
-    /// <summary>这一方的疲劳在第几秒开始（绝对时间）。默认 SandstormStart。</summary>
+    /// <summary>这一方的力歇在第几秒开始（绝对时间）。默认 FatigueDefaultStart。</summary>
     public float FatigueStart;
     /// <summary>这一方已经挨了几阵。</summary>
     public int FatigueTicks;
@@ -232,18 +232,21 @@ public sealed class DeckBattle
     public const float PoisonPerStackPerSecond = 1.0f;
     // —————————————— 力歇（衰歇期）——————————————
     //
+    // 命名：常量与字段统一用 Fatigue（力歇的机制名），不再出现 Sandstorm。
+    // 玩家看到的是「力歇」，代码里读的是「Fatigue」，两边对得上。
+    //
     // 参考《The Bazaar》：战斗拖到一定时间后，双方一起掉血，逼「只堆护体 / 治疗不出输出」的构筑没法靠磨赢。
     // 2026-11-25 用户定：**1 秒 4 跳、每跳伤害 +1**，风暴一旦开始就快速收尾。
     //   60 秒起（TimeLimit 90 的三分之二），正常战斗 20~35 秒结束，碰不到；
     //   0.25 秒一跳 → 第 1 秒掉 1+2+3+4 = 10，第 5 秒累计 210，第 10 秒累计 820；
     //   任何血量（260~554）都撑不过 10 秒，护体 40 也只是多挡两跳。
-    public const float SandstormStart = 60f;
-    public const float SandstormInterval = 0.25f;
-    public const int SandstormBase = 1;
-    public const int SandstormStep = 1;
+    public const float FatigueDefaultStart = 60f;
+    public const float FatigueInterval = 0.25f;
+    public const int FatigueBase = 1;
+    public const int FatigueStep = 1;
 
-    /// <summary>力歇是否已经开始（任一方进入疲劳）。</summary>
-    public int SandstormTicks
+    /// <summary>力歇是否已经开始（任一方）。</summary>
+    public int FatiguePeakTicks
     {
         get
         {
@@ -257,16 +260,16 @@ public sealed class DeckBattle
     }
 
     /// <summary>下一阵力歇伤害（界面上显示"下一跳 N"用，取玩家侧的）。</summary>
-    public int SandstormNextDamage
+    public int FatigueNextDamage
     {
         get
         {
-            return SandstormBase + SandstormStep * Player.FatigueTicks;
+            return FatigueBase + FatigueStep * Player.FatigueTicks;
         }
     }
 
     /// <summary>力歇是否已经开始（任一方）。</summary>
-    public bool SandstormActive
+    public bool FatigueActive
     {
         get
         {
@@ -403,7 +406,7 @@ public sealed class DeckBattle
         fighter.Portrait = portrait;
         fighter.MaxHp = maxHp;
         fighter.Hp = maxHp;
-        fighter.FatigueStart = SandstormStart;
+        fighter.FatigueStart = FatigueDefaultStart;
         fighter.Hand = new HandSlot[HandMax];
 
         for (int i = 0; i < HandMax; i++)
@@ -467,7 +470,7 @@ public sealed class DeckBattle
         fighter.Portrait = portrait;
         fighter.MaxHp = maxHp;
         fighter.Hp = maxHp;
-        fighter.FatigueStart = SandstormStart;
+        fighter.FatigueStart = FatigueDefaultStart;
         fighter.Hand = new HandSlot[HandMax];
 
         for (int i = 0; i < HandMax; i++)
@@ -552,13 +555,13 @@ public sealed class DeckBattle
         }
 
         owner.FatigueTimer += dt;
-        while (owner.FatigueTimer >= SandstormInterval)
+        while (owner.FatigueTimer >= FatigueInterval)
         {
-            owner.FatigueTimer -= SandstormInterval;
+            owner.FatigueTimer -= FatigueInterval;
 
-            int damage = SandstormBase + SandstormStep * owner.FatigueTicks;
+            int damage = FatigueBase + FatigueStep * owner.FatigueTicks;
             owner.FatigueTicks++;
-            ApplySandstormHit(owner, damage, events);
+            ApplyFatigueHit(owner, damage, events);
         }
     }
 
@@ -579,7 +582,7 @@ public sealed class DeckBattle
         }
     }
 
-    private void ApplySandstormHit(FighterState victim, int damage, List<BattleEvent> events)
+    private void ApplyFatigueHit(FighterState victim, int damage, List<BattleEvent> events)
     {
         if (victim.Dead)
         {
