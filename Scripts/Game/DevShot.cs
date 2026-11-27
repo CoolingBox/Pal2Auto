@@ -272,7 +272,7 @@ public static class DevShot
                 battle.Player.PoisonStacks = startPoison;
             }
 
-            // --simstorm=1 打印沙尘暴的头几跳，验证「起始 1 伤、每跳 +1」
+            // --simstorm=1 打印力歇的头几跳，验证「起始 1 伤、每跳 +1」
             bool traceStorm = ReadIntArg("--simstorm=", 0) > 0 || ReadIntArg("--simpoison=", 0) > 0;
             int stormPrinted = 0;
             if (testPriority && battleCards.Count > 0)
@@ -294,7 +294,8 @@ public static class DevShot
                 {
                     for (int e = 0; e < stepEvents.Count; e++)
                     {
-                        if (stepEvents[e].Text != null && stepEvents[e].Text.StartsWith("化毒"))
+                        if (stepEvents[e].Text != null &&
+                            (stepEvents[e].Text.StartsWith("化毒") || stepEvents[e].Text.StartsWith("力歇")))
                         {
                             GD.Print("CURE " + stepEvents[e].Text);
                             stormPrinted++;

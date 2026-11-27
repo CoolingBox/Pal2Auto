@@ -153,7 +153,7 @@ public sealed class FighterState
     public float PoisonAccum;
     public float PoisonDecay;
 
-    // —— 疲劳（沙尘暴）—— 每方独立计时，卡牌效果可以提前或延后
+    // —— 疲劳（力歇）—— 每方独立计时，卡牌效果可以提前或延后
     /// <summary>这一方的疲劳在第几秒开始（绝对时间）。默认 SandstormStart。</summary>
     public float FatigueStart;
     /// <summary>这一方已经挨了几阵。</summary>
@@ -230,7 +230,7 @@ public sealed class DeckBattle
     /// 注：毒**穿护体**（`ApplyDamage(..., ignoreShield: true)`），护体挡不住它。
     /// </summary>
     public const float PoisonPerStackPerSecond = 1.0f;
-    // —————————————— 沙尘暴（衰歇期）——————————————
+    // —————————————— 力歇（衰歇期）——————————————
     //
     // 参考《The Bazaar》：战斗拖到一定时间后，双方一起掉血，逼「只堆护体 / 治疗不出输出」的构筑没法靠磨赢。
     // 2026-11-25 用户定：**1 秒 4 跳、每跳伤害 +1**，风暴一旦开始就快速收尾。
@@ -242,7 +242,7 @@ public sealed class DeckBattle
     public const int SandstormBase = 1;
     public const int SandstormStep = 1;
 
-    /// <summary>沙尘暴是否已经开始（任一方进入疲劳）。</summary>
+    /// <summary>力歇是否已经开始（任一方进入疲劳）。</summary>
     public int SandstormTicks
     {
         get
@@ -256,7 +256,7 @@ public sealed class DeckBattle
         }
     }
 
-    /// <summary>下一阵沙尘暴伤害（界面上显示"下一跳 N"用，取玩家侧的）。</summary>
+    /// <summary>下一阵力歇伤害（界面上显示"下一跳 N"用，取玩家侧的）。</summary>
     public int SandstormNextDamage
     {
         get
@@ -265,7 +265,7 @@ public sealed class DeckBattle
         }
     }
 
-    /// <summary>沙尘暴是否已经开始（任一方）。</summary>
+    /// <summary>力歇是否已经开始（任一方）。</summary>
     public bool SandstormActive
     {
         get
@@ -282,7 +282,7 @@ public sealed class DeckBattle
 
     /// <summary>
     /// 「同时出手」的判定窗口：一方倒下后不立刻结算，继续观察这么久。
-    /// 0.1 秒 = 1 秒 10 次判定 —— 这期间对手如果也被毒 / 沙尘暴带走，算双方同时出手，判玩家赢。
+    /// 0.1 秒 = 1 秒 10 次判定 —— 这期间对手如果也被毒 / 力歇带走，算双方同时出手，判玩家赢。
     /// </summary>
     public const float SimultaneousWindow = 0.1f;
 
@@ -293,7 +293,7 @@ public sealed class DeckBattle
     /// <summary>
     /// 护体**不设上限**（2026-11-25 改）。原来这里是 40，理由是「护体不衰减，无限叠会无敌」——
     /// 但这个理由站不住：参考《The Bazaar》，护盾本来就没有上限（单件磁力护盾就给 100~200 盾），
-    /// 它靠的是**沙尘暴**兜底：风暴伤害每跳 +1、1 秒 4 跳，最终一定压过任何护盾。
+    /// 它靠的是**力歇**兜底：风暴伤害每跳 +1、1 秒 4 跳，最终一定压过任何护盾。
     /// 上限的存在反而掐死了守赢流 —— 5 槽护体流每 3 秒能加 60 盾，上限 40 意味着三分之二白给。
     /// </summary>
     public const int ShieldCap = 9999;
@@ -538,10 +538,10 @@ public sealed class DeckBattle
     }
 
     /// <summary>
-    /// 沙尘暴：TimeLimit 到点前先替玩家结束战斗。伤害无视护体（护体是「挡刀」的，挡不了天气）。
+    /// 力歇：TimeLimit 到点前先替玩家结束战斗。护体可以挡（挡得住刀就挡得住风沙）。
     /// </summary>
     /// <summary>
-    /// 疲劳（沙尘暴）：**每方各自计时**，谁的 FatigueStart 先到谁先开始挨风沙。
+    /// 力歇：**每方各自计时**，谁的 FatigueStart 先到谁先开始掉血。
     /// 卡牌可以用 `FatigueShift` 把某一边的疲劳提前（打快攻）或延后（拖后期）。
     /// </summary>
     private void TickFatigue(FighterState owner, float dt, List<BattleEvent> events)
@@ -599,7 +599,7 @@ public sealed class DeckBattle
         ev.Side = SideOf(victim);
         ev.Value = dealt;
         ev.Absorbed = absorbed;
-        ev.Text = "沙尘暴 " + damage + "（" + victim.Name + " 第 " + victim.FatigueTicks + " 阵）";
+        ev.Text = "力歇 " + damage + "（" + victim.Name + " 第 " + victim.FatigueTicks + " 阵）";
         events.Add(ev);
     }
 
@@ -952,7 +952,7 @@ public sealed class DeckBattle
         {
             // 记"实际拿到的护体"：已经顶到上限时，写 +0 比写 +8 诚实
             int shieldBefore = owner.Shield;
-            // 不封顶：护体可以一直叠，直到沙尘暴把它打穿
+            // 不封顶：护体可以一直叠，直到力歇把它打穿
             owner.Shield += card.Shield;
             int gained = owner.Shield - shieldBefore;
             owner.Stats.ShieldGained += gained;
@@ -1361,9 +1361,9 @@ public sealed class DeckBattle
         Finished = true;
         TimedOut = !playerDead && !enemyDead;
 
-        // 平局一律判玩家赢（2026-11-25 用户定，不限于沙尘暴）：两种情况算平
+        // 平局一律判玩家赢（2026-11-25 用户定，不限于力歇）：两种情况算平
         //   ① 时间到、双方都还活着且残血比例相同 → 让玩家过
-        //   ② 双方同时倒下（毒 / 沙尘暴同时结算）→ 也算玩家赢
+        //   ② 双方同时倒下（毒 / 力歇同时结算）→ 也算玩家赢
         if (TimedOut)
         {
             PlayerWon = Player.HpRatio >= Enemy.HpRatio;

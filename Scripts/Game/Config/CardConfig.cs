@@ -132,7 +132,7 @@ public class CardConfig : BaseConfig
     public bool BottomOfDeck;
 
     /// <summary>
-    /// 疲劳位移（秒）。正数 = 让目标**提前**进入沙尘暴，负数 = 延后。
+    /// 疲劳位移（秒）。正数 = 让目标**提前**进入力歇，负数 = 延后。
     /// 作用于谁看 `Scope`：Self 自己、Foe 敌方、Both 双方。
     /// 「催命」类卡把它打在敌人身上（对方先挨风沙），「续命」类卡打在自己身上（拖到后期）。
     /// </summary>
