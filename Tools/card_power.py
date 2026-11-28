@@ -20,6 +20,7 @@
 用法：
     python Tools/card_power.py            # 打印全卡池分值分布
     python Tools/card_power.py --family   # 按族看四阶成长
+    python Tools/card_power.py --deck     # 按「均值」看 62 只怪的牌组质量
 """
 
 import json
@@ -113,6 +114,30 @@ def main():
     print("分值分布：最高 %.2f / 中位 %.2f / 最低 %.2f"
           % (rows[0][0], rows[len(rows) // 2][0], rows[-1][0]))
     print()
+
+    if "--deck" in sys.argv:
+        enemies_path = os.path.join(ROOT, "Resources", "Config", "EnemyConfig.json")
+        enemies = json.load(open(enemies_path, encoding="utf-8"))
+        by_id = {c["Id"]: c for c in cards}
+        print("%-6s %-12s %-8s %-5s %-7s %-7s" % ("品阶", "名称", "张数", "均值", "总分", "最强/最弱"))
+        groups = {}
+        for e in enemies:
+            powers = [card_power(by_id[i])[0] for i in e["Deck"] if i in by_id]
+            if not powers:
+                continue
+            avg = sum(powers) / len(powers)
+            groups.setdefault(e["Tier"], []).append((avg, sum(powers), len(powers), e["Id"], e["Name"]))
+        for tier in ("Bronze", "Silver", "Gold", "Diamond", "Legend"):
+            group = sorted(groups.get(tier, []), key=lambda x: -x[0])
+            if not group:
+                continue
+            avgs = [g[0] for g in group]
+            print("== %s：%d 只，均值 %.2f，区间 %.2f ~ %.2f =="
+                  % (tier, len(group), sum(avgs) / len(avgs), min(avgs), max(avgs)))
+            for avg, total, count, eid, name in group:
+                print("  %-4d %-12s %-5d 均值 %.2f 总分 %.1f"
+                      % (eid, name[:10], count, avg, total))
+        return 0
 
     if "--family" in sys.argv:
         fam = {}
