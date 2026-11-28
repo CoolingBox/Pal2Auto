@@ -349,5 +349,28 @@ public static class RunSimulator
         TinyLog.Info("RunLog",
             "最终牌组阶位：铜 " + counts[1] + " / 银 " + counts[2] +
             " / 金 " + counts[3] + " / 钻 " + counts[4]);
+
+        // 单卡均值（不看总分：总分会被张数带偏）。起始卡单独算一份，别让它把均值拖下去。
+        float average = CardPowerUtility.Average(result.FinalDeck);
+        float top;
+        float low;
+        CardPowerUtility.Range(result.FinalDeck, out top, out low);
+
+        List<RunCard> grown = new List<RunCard>();
+        for (int i = 0; i < result.FinalDeck.Count; i++)
+        {
+            CardConfig cfg = result.FinalDeck[i].Config;
+            if (cfg != null && cfg.StarterOnly)
+            {
+                continue;
+            }
+            grown.Add(result.FinalDeck[i]);
+        }
+        float grownAverage = CardPowerUtility.Average(grown);
+
+        TinyLog.Info("RunLog",
+            "最终牌组质量：" + result.FinalDeck.Count + " 张，单卡均值 " + average.ToString("0.00") +
+            "（去掉起始卡 " + grownAverage.ToString("0.00") + "），最高 " + top.ToString("0.00") +
+            " / 最低 " + low.ToString("0.00"));
     }
 }
